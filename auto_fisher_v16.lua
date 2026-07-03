@@ -1,5 +1,5 @@
 -- =============================================
--- Auto Fisher v12 - Peak Blatant Optimization
+-- Auto Fisher v16 - Peak Blatant Optimization
 -- For: Anime Card Collection (Fish It!)
 -- Author: LO + ENI
 -- =============================================
