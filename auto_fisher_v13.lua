@@ -1,5 +1,5 @@
 -- =============================================
--- Auto Fisher v12 - Precise Delay Input & Minimize
+-- Auto Fisher v13 - Precise Delay Input & Minimize
 -- For: Anime Card Collection (Fish It!)
 -- Author: LO + ENI
 -- =============================================
@@ -77,7 +77,7 @@ end
 -- UI CREATION
 -- =============================================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "AutoFishUI_v12"
+screenGui.Name = "AutoFishUI_v13"
 screenGui.ResetOnSpawn = false
 screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 screenGui.Parent = PlayerGui
@@ -100,7 +100,7 @@ local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 26)
 title.Position = UDim2.new(0, 0, 0, 0)
 title.BorderSizePixel = 0
-title.Text = " 🎣 Auto Fisher v12"
+title.Text = " 🎣 Auto Fisher v13"
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
 title.TextScaled = true
 title.TextXAlignment = Enum.TextXAlignment.Left
@@ -773,4 +773,4 @@ end)
 -- INIT
 -- =============================================
 updateModeUI()
-print("[Auto Fisher v12] Loaded!")
+print("[Auto Fisher v13] Loaded!")
