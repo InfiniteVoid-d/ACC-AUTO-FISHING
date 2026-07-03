@@ -1,5 +1,5 @@
 -- =============================================
--- Auto Fisher v12 - Precise Delay Input & Minimize
+-- Auto Fisher v14 - Dynamic Hybrid & Instant Delay
 -- For: Anime Card Collection (Fish It!)
 -- Author: LO + ENI
 -- =============================================
@@ -30,9 +30,9 @@ local Config = {
 
     -- Blatant
     BlatantClickDelay = 0.02,
-    BlatantHybridDelay = 3.5,
+    BlatantHybridDelay = 3.5,    -- Default hybrid wait (Fires catch remote)
     
-    -- Instant settings (Adjustable via UI input box):
+    -- Instant settings:
     InstantCatchDelay = 2.0,     -- Default delay before catch
     
     BlatantRecastDelay = 0.15,
@@ -77,7 +77,7 @@ end
 -- UI CREATION
 -- =============================================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "AutoFishUI_v12"
+screenGui.Name = "AutoFishUI_v14"
 screenGui.ResetOnSpawn = false
 screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 screenGui.Parent = PlayerGui
@@ -100,7 +100,7 @@ local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 26)
 title.Position = UDim2.new(0, 0, 0, 0)
 title.BorderSizePixel = 0
-title.Text = " 🎣 Auto Fisher v12"
+title.Text = " 🎣 Auto Fisher v14"
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
 title.TextScaled = true
 title.TextXAlignment = Enum.TextXAlignment.Left
@@ -278,8 +278,9 @@ local function updateModeUI()
     parallelBtn.Visible = isBlatant
     autoSellBtn.Visible = true
     
+    local showDelayInput = isBlatant and (Config.BlatantStrategy == "instant" or Config.BlatantStrategy == "hybrid")
     if not UICollapsed then
-        inputContainer.Visible = isBlatant and (Config.BlatantStrategy == "instant")
+        inputContainer.Visible = showDelayInput
     end
 
     if isBlatant then
@@ -290,6 +291,15 @@ local function updateModeUI()
             or Color3.fromRGB(120, 50, 180)
         stratLabel.Text = "Strategy: " .. s
         stratLabel.TextColor3 = Color3.fromRGB(200, 200, 210)
+        
+        -- Update input box content dynamically based on selected strategy
+        if s == "instant" then
+            inputLabel.Text = "Instant Catch Delay (s):"
+            delayInputBox.Text = tostring(Config.InstantCatchDelay)
+        elseif s == "hybrid" then
+            inputLabel.Text = "Hybrid Catch Delay (s):"
+            delayInputBox.Text = tostring(Config.BlatantHybridDelay)
+        end
     end
 
     parallelBtn.Text = Config.BlatantParallelCasts and "⚡ Parallel: ON" or "⚡ Parallel: OFF"
@@ -341,11 +351,17 @@ delayInputBox.FocusLost:Connect(function(enterPressed)
     local val = tonumber(delayInputBox.Text)
     if val then
         val = math.max(val, 0.001) -- Clamp at 1ms minimum
-        Config.InstantCatchDelay = val
+        if Config.BlatantStrategy == "instant" then
+            Config.InstantCatchDelay = val
+            setDebug("Instant delay set to " .. val .. "s")
+        elseif Config.BlatantStrategy == "hybrid" then
+            Config.BlatantHybridDelay = val
+            setDebug("Hybrid delay set to " .. val .. "s")
+        end
         delayInputBox.Text = tostring(val)
-        setDebug("Delay set to " .. val .. "s")
     else
-        delayInputBox.Text = tostring(Config.InstantCatchDelay)
+        local currentDelay = Config.BlatantStrategy == "instant" and Config.InstantCatchDelay or Config.BlatantHybridDelay
+        delayInputBox.Text = tostring(currentDelay)
         setDebug("Invalid number entered!")
     end
 end)
@@ -656,6 +672,9 @@ local function startAutoFish()
             handleEscape()
         elseif eventType == "EquipRod" or eventType == "OpenTreasure" then
             setDebug("Event: " .. tostring(eventType))
+            
+            -- If we cast in hybrid mode, the game skips client-side StartFishing minigame trigger,
+            -- but we can recast on next frame if we detect equip.
         elseif eventType == "Sold" then
             setDebug("Duplicate Sold successfully!")
         else
