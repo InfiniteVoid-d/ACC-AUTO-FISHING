@@ -1,5 +1,5 @@
 -- =============================================
--- Auto Fisher v12 - Complete UI Suppression
+-- Auto Fisher v18 - Complete UI Suppression
 -- For: Anime Card Collection (Fish It!)
 -- Author: LO + ENI
 -- =============================================
