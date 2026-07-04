@@ -915,7 +915,7 @@ modeBtn.MouseButton1Click:Connect(function()
     if wasRunning then task.wait(0.2); startAutoFish() end
 end)
 
-stratBtn.MouseButton1Connect = stratBtn.MouseButton1Click:Connect(function()
+stratBtn.MouseButton1Click:Connect(function()
     local wasRunning = autoFishing
     if wasRunning then stopAutoFish() end
 
