@@ -551,6 +551,21 @@ local function startClicking(delay)
     end)
 end
 
+-- =============================================
+-- DYNAMIC DELAY CALCULATOR FOR RARE FISH (NEW)
+-- =============================================
+local function getCatchDelayForFish(fishName)
+    local baseDelay = Config.InstantCatchDelay
+    if not fishName then return baseDelay end
+    
+    local nameLower = fishName:lower()
+    -- Keywords for rare/high-tier fish that require a longer struggle window
+    if nameLower:find("legendary") or nameLower:find("mythical") or nameLower:find("giant") or nameLower:find("gold") or nameLower:find("diamond") or nameLower:find("ancient") or nameLower:find("kraken") or nameLower:find("whale") then
+        return baseDelay + 0.8 -- Add a 0.8s buffer to prevent server-side escapes
+    end
+    return baseDelay
+end
+
 local function stopClicking()
     clicking = false
     if clickThread then
@@ -616,21 +631,6 @@ local function findFishHandlerLoop()
         end
     end
     return nil
-end
-
--- =============================================
--- DYNAMIC DELAY CALCULATOR FOR RARE FISH (NEW)
--- =============================================
-local function getCatchDelayForFish(fishName)
-    local baseDelay = Config.InstantCatchDelay
-    if not fishName then return baseDelay end
-    
-    local nameLower = fishName:lower()
-    -- Keywords for rare/high-tier fish that require a longer struggle window
-    if nameLower:find("legendary") or nameLower:find("mythical") or nameLower:find("giant") or nameLower:find("gold") or nameLower:find("diamond") or nameLower:find("ancient") or nameLower:find("kraken") or nameLower:find("whale") then
-        return baseDelay + 0.8 -- Add a 0.8s buffer to prevent server-side escapes
-    end
-    return baseDelay
 end
 
 -- =============================================
