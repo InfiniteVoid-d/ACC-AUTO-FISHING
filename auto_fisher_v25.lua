@@ -497,12 +497,7 @@ local function enableGPU()
     label.TextXAlignment = Enum.TextXAlignment.Center
     label.Parent = blackFrame
     
-    local coreGui = pcall(function() return game:GetService("CoreGui") end)
-    if coreGui then
-        whiteScreen.Parent = game:GetService("CoreGui")
-    else
-        whiteScreen.Parent = PlayerGui
-    end
+    whiteScreen.Parent = PlayerGui
     setDebug("GPU Saver enabled")
 end
 
