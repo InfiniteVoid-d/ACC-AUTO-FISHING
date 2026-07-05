@@ -921,7 +921,7 @@ end
 -- =============================================
 -- ANTI-AFK
 -- =============================================
-LocalPlayer.Idled:Connect(function()
+player.Idled:Connect(function()
     VirtualUser:CaptureController()
     VirtualUser:ClickButton2(Vector2.new())
 end)
