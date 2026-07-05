@@ -1,5 +1,5 @@
 -- =============================================
--- Auto Fisher v24 - Precise Caught Counter
+-- Auto Fisher v25 - GPU Saver Mode
 -- For: Anime Card Collection (Fish It!)
 -- Author: LO + ENI
 -- =============================================
@@ -9,6 +9,7 @@ local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local VirtualUser = game:GetService("VirtualUser")
 
 local player = Players.LocalPlayer
 local PlayerGui = player.PlayerGui
@@ -38,10 +39,12 @@ local Config = {
     
     BlatantRecastDelay = 0.05,   -- Recast delay between catches (default 0.05s)
     BlatantCastValue = 1.0,      -- Perfect cast
-    BlatantParallelCasts = true,
     
     -- Auto Sell Duplicate Fish
     AutoSellDupes = false,
+
+    -- GPU Saver
+    GPUSaver = false,
 
     -- Shared
     SafetyRecastTime = 8.0,
@@ -67,6 +70,9 @@ local waitingForCatch = false
 local UICollapsed = false
 local originalHeight = 235
 
+local gpuActive = false
+local whiteScreen = nil
+
 local FishUI = PlayerGui:FindFirstChild("FishUI")
 
 -- =============================================
@@ -82,9 +88,10 @@ end
 -- UI CREATION
 -- =============================================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "AutoFishUI_v24"
+screenGui.Name = "AutoFishUI_v25"
 screenGui.ResetOnSpawn = false
 screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.DisplayOrder = 1000000 -- Stay on top of GPU Saver screen
 screenGui.Parent = PlayerGui
 
 local frame = Instance.new("Frame")
@@ -194,16 +201,16 @@ toggleBtn.Font = Enum.Font.GothamBold
 toggleBtn.Parent = frame
 Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 6)
 
--- Toggles Row (Parallel Casts & Auto Sell duplicates)
-local parallelBtn = Instance.new("TextButton")
-parallelBtn.Size = UDim2.new(0.5, -15, 0, 20)
-parallelBtn.Position = UDim2.new(0, 10, 0, 118)
-parallelBtn.BorderSizePixel = 0
-parallelBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-parallelBtn.TextScaled = true
-parallelBtn.Font = Enum.Font.Gotham
-parallelBtn.Parent = frame
-Instance.new("UICorner", parallelBtn).CornerRadius = UDim.new(0, 6)
+-- Toggles Row (GPU Saver & Auto Sell duplicates)
+local gpuBtn = Instance.new("TextButton")
+gpuBtn.Size = UDim2.new(0.5, -15, 0, 20)
+gpuBtn.Position = UDim2.new(0, 10, 0, 118)
+gpuBtn.BorderSizePixel = 0
+gpuBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+gpuBtn.TextScaled = true
+gpuBtn.Font = Enum.Font.Gotham
+gpuBtn.Parent = frame
+Instance.new("UICorner", gpuBtn).CornerRadius = UDim.new(0, 6)
 
 local autoSellBtn = Instance.new("TextButton")
 autoSellBtn.Size = UDim2.new(0.5, -15, 0, 20)
@@ -297,7 +304,7 @@ debugLabel.Parent = frame
 local strategies = {"instant", "turbo", "hybrid", "blatant"}
 local childrenToToggle = {
     modeLabel, stratLabel, statusLabel, statsLabel,
-    modeBtn, stratBtn, toggleBtn, parallelBtn, autoSellBtn,
+    modeBtn, stratBtn, toggleBtn, gpuBtn, autoSellBtn,
     inputContainer, thresholdContainer, debugLabel
 }
 
@@ -313,7 +320,7 @@ local function updateModeUI()
 
     stratBtn.Visible = isBlatant
     stratLabel.Visible = isBlatant
-    parallelBtn.Visible = isBlatant
+    gpuBtn.Visible = true
     autoSellBtn.Visible = true
     
     local showDelay = isBlatant and (Config.BlatantStrategy == "instant" or Config.BlatantStrategy == "hybrid" or Config.BlatantStrategy == "blatant")
@@ -350,8 +357,8 @@ local function updateModeUI()
         end
     end
 
-    parallelBtn.Text = Config.BlatantParallelCasts and "⚡ Parallel: ON" or "⚡ Parallel: OFF"
-    parallelBtn.BackgroundColor3 = Config.BlatantParallelCasts and Color3.fromRGB(180, 100, 0) or Color3.fromRGB(50, 50, 55)
+    gpuBtn.Text = Config.GPUSaver and "🖥️ GPU: ON" or "🖥️ GPU: OFF"
+    gpuBtn.BackgroundColor3 = Config.GPUSaver and Color3.fromRGB(180, 100, 0) or Color3.fromRGB(50, 50, 55)
 
     autoSellBtn.Text = Config.AutoSellDupes and "💰 SellDupes: ON" or "💰 SellDupes: OFF"
     autoSellBtn.BackgroundColor3 = Config.AutoSellDupes and Color3.fromRGB(180, 100, 0) or Color3.fromRGB(50, 50, 55)
@@ -456,6 +463,66 @@ local function lockUIHidden(lock)
 end
 
 -- =============================================
+-- GPU SAVER MODE IMPLEMENTATION
+-- =============================================
+local function enableGPU()
+    if gpuActive then return end
+    gpuActive = true
+    pcall(function()
+        settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+        game.Lighting.GlobalShadows = false
+        game.Lighting.FogEnd = 1
+        setfpscap(8)
+    end)
+    
+    whiteScreen = Instance.new("ScreenGui")
+    whiteScreen.Name = "AutoFishUI_GPUSaver"
+    whiteScreen.ResetOnSpawn = false
+    whiteScreen.DisplayOrder = 999999
+    
+    local blackFrame = Instance.new("Frame")
+    blackFrame.Size = UDim2.new(1, 0, 1, 0)
+    blackFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+    blackFrame.BorderSizePixel = 0
+    blackFrame.Parent = whiteScreen
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0, 400, 0, 100)
+    label.Position = UDim2.new(0.5, -200, 0.5, -50)
+    label.BackgroundTransparency = 1
+    label.Text = "🖥️ GPU SAVER ACTIVE\n\nAuto Fisher running...\nPress 'GPU: OFF' to restore graphics."
+    label.TextColor3 = Color3.fromRGB(0, 220, 120)
+    label.TextSize = 20
+    label.Font = Enum.Font.GothamBold
+    label.TextXAlignment = Enum.TextXAlignment.Center
+    label.Parent = blackFrame
+    
+    local coreGui = pcall(function() return game:GetService("CoreGui") end)
+    if coreGui then
+        whiteScreen.Parent = game:GetService("CoreGui")
+    else
+        whiteScreen.Parent = PlayerGui
+    end
+    setDebug("GPU Saver enabled")
+end
+
+local function disableGPU()
+    if not gpuActive then return end
+    gpuActive = false
+    pcall(function()
+        settings().Rendering.QualityLevel = Enum.QualityLevel.Automatic
+        game.Lighting.GlobalShadows = true
+        game.Lighting.FogEnd = 100000
+        setfpscap(0)
+    end)
+    if whiteScreen then
+        whiteScreen:Destroy()
+        whiteScreen = nil
+    end
+    setDebug("GPU Saver disabled")
+end
+
+-- =============================================
 -- DUPLICATES SELLING ENGINE
 -- =============================================
 local function getInventory()
@@ -551,21 +618,6 @@ local function startClicking(delay)
     end)
 end
 
--- =============================================
--- DYNAMIC DELAY CALCULATOR FOR RARE FISH (NEW)
--- =============================================
-local function getCatchDelayForFish(fishName)
-    local baseDelay = Config.InstantCatchDelay
-    if not fishName then return baseDelay end
-    
-    local nameLower = fishName:lower()
-    -- Keywords for rare/high-tier fish that require a longer struggle window
-    if nameLower:find("legendary") or nameLower:find("mythical") or nameLower:find("giant") or nameLower:find("gold") or nameLower:find("diamond") or nameLower:find("ancient") or nameLower:find("kraken") or nameLower:find("whale") then
-        return baseDelay + 0.8 -- Add a 0.8s buffer to prevent server-side escapes
-    end
-    return baseDelay
-end
-
 local function stopClicking()
     clicking = false
     if clickThread then
@@ -591,19 +643,7 @@ end
 -- =============================================
 local function doCast()
     local castVal = Config.Mode == "Blatant" and Config.BlatantCastValue or Config.LegitCastValue
-
-    if Config.Mode == "Blatant" and Config.BlatantParallelCasts then
-        task.spawn(function()
-            pcall(Fish.FireServer, Fish, "CastRod", castVal)
-        end)
-        task.wait(0.02) -- 20ms split for near-simultaneous parallel casts
-        task.spawn(function()
-            pcall(Fish.FireServer, Fish, "CastRod", castVal)
-        end)
-    else
-        pcall(Fish.FireServer, Fish, "CastRod", castVal)
-    end
-
+    pcall(Fish.FireServer, Fish, "CastRod", castVal)
     setStatus("Casting...", Color3.fromRGB(255, 214, 0))
     setDebug("Cast sent (Perfect)")
 end
@@ -673,7 +713,6 @@ local function startInstantLoop()
                                 local currentUps = getupvalues(fn)
                             until not autoFishing or not currentUps or currentUps[1] == false
                             
-                            -- NOTE: Stats are now incremented only by the server-response connection listener!
                             setStatus("Caught!", Color3.fromRGB(100, 220, 255))
                             setDebug("Cycle complete")
                         end
@@ -709,47 +748,25 @@ local function strategyHybrid(fishName)
 end
 
 -- =============================================
--- PURE SEQUENTIAL BLATANT CAST/CATCH LOOP (REVERTED FOR ACC SERVER COMPATIBILITY)
+-- PURE SEQUENTIAL BLATANT CAST/CATCH LOOP
 -- =============================================
 local function startBlatantLoop()
     cancelInstantThread()
     blatantThread = task.spawn(function()
         while autoFishing and Config.BlatantStrategy == "blatant" do
             setStatus("🔥 BLT: Casting...", Color3.fromRGB(255, 100, 0))
-            setDebug("Casting parallel rods...")
+            setDebug("Casting rod...")
             
             local castVal = Config.BlatantCastValue
-            
-            if Config.BlatantParallelCasts then
-                -- Cast 1
-                task.spawn(function()
-                    pcall(Fish.FireServer, Fish, "CastRod", castVal)
-                end)
-                task.wait(0.05) -- Overlapping delay matching Fish It!
-                -- Cast 2
-                task.spawn(function()
-                    pcall(Fish.FireServer, Fish, "CastRod", castVal)
-                end)
-            else
-                pcall(Fish.FireServer, Fish, "CastRod", castVal)
-            end
+            pcall(Fish.FireServer, Fish, "CastRod", castVal)
             
             -- Wait the Catch Delay (struggle delay) sequentially BEFORE catching
             task.wait(Config.InstantCatchDelay)
             if not autoFishing or Config.BlatantStrategy ~= "blatant" then break end
             
             setStatus("🔥 BLT: Catching...", Color3.fromRGB(0, 180, 255))
-            setDebug("Firing FishCaught spam...")
-            
-            if Config.BlatantParallelCasts then
-                -- Fire FishCaught multiple times (like the 5x reel spam in Fish It!)
-                for i = 1, 3 do
-                    pcall(Fish.FireServer, Fish, "FishCaught")
-                    task.wait(0.05)
-                end
-            else
-                pcall(Fish.FireServer, Fish, "FishCaught")
-            end
+            setDebug("Firing FishCaught remote...")
+            pcall(Fish.FireServer, Fish, "FishCaught")
             
             -- Wait recast delay before casting again
             task.wait(Config.BlatantRecastDelay)
@@ -783,7 +800,6 @@ local function handleCatch(eventType, fishName)
         cancelInstantThread()
     end
     waitingForCatch = false
-    -- Stats are incremented in the global listener connection below!
     local label = eventType == "FishCaught" and "Caught! " .. tostring(fishName or "") or "Claimed!"
     setStatus(label, Color3.fromRGB(100, 220, 255))
     setDebug("Catch confirmed")
@@ -829,7 +845,6 @@ local function startAutoFish()
         if eventType == "StartFishing" then
             handleStartFishing(fishName)
         elseif eventType == "FishCaught" or eventType == "FishClaimed" then
-            -- Increment caught stats only on real server confirmation!
             fishCaught = fishCaught + 1
             updateStats()
             handleCatch(eventType, fishName)
@@ -904,6 +919,14 @@ local function stopAutoFish()
 end
 
 -- =============================================
+-- ANTI-AFK
+-- =============================================
+LocalPlayer.Idled:Connect(function()
+    VirtualUser:CaptureController()
+    VirtualUser:ClickButton2(Vector2.new())
+end)
+
+-- =============================================
 -- BUTTONS
 -- =============================================
 toggleBtn.MouseButton1Click:Connect(function()
@@ -932,9 +955,14 @@ stratBtn.MouseButton1Click:Connect(function()
     if wasRunning then task.wait(0.2); startAutoFish() end
 end)
 
-parallelBtn.MouseButton1Click:Connect(function()
-    Config.BlatantParallelCasts = not Config.BlatantParallelCasts
+gpuBtn.MouseButton1Click:Connect(function()
+    Config.GPUSaver = not Config.GPUSaver
     updateModeUI()
+    if Config.GPUSaver then
+        enableGPU()
+    else
+        disableGPU()
+    end
 end)
 
 autoSellBtn.MouseButton1Click:Connect(function()
