@@ -519,9 +519,6 @@ local function enableGPU()
     setDebug("GPU Saver enabled")
 end
 
--- =============================================
--- AUTO COLLECT MONEY ENGINE (FLOOR & CARD BINDER)
--- =============================================
 local function disableGPU()
     if not gpuActive then return end
     gpuActive = false
@@ -538,6 +535,9 @@ local function disableGPU()
     setDebug("GPU Saver disabled")
 end
 
+-- =============================================
+-- AUTO COLLECT MONEY ENGINE (FLOOR & CARD BINDER)
+-- =============================================
 local function cancelCollectThread()
     if collectThread then
         pcall(task.cancel, collectThread)
