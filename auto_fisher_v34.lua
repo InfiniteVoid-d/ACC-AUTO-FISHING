@@ -545,25 +545,34 @@ local function cancelCollectThread()
     end
 end
 
-local cachedPlot = nil
 local function findMyPlot()
-    if cachedPlot and cachedPlot.Parent == workspace:FindFirstChild("Plots") then
-        return cachedPlot
-    end
     local plotsFolder = workspace:FindFirstChild("Plots")
     if not plotsFolder then return nil end
     for _, p in ipairs(plotsFolder:GetChildren()) do
+        -- Check the Timer descendant first (accurate & fast)
+        local timer = p:FindFirstChild("Timer", true)
+        if timer and timer:GetAttribute("Owner") == player.Name then
+            return p
+        end
+        -- Fallback 1: check Owner/Player attributes directly on the plot
+        if p:GetAttribute("Owner") == player.Name or p:GetAttribute("Player") == player.Name then
+            return p
+        end
+        -- Fallback 2: check string values or attributes named Owner
         for _, descendant in ipairs(p:GetDescendants()) do
-            local val = nil
-            pcall(function() val = descendant.Value end)
-            if tostring(val) == player.Name or descendant.Name == player.Name then
-                cachedPlot = p
-                return p
-            end
-            local ownerAttr = descendant:GetAttribute("Owner") or descendant:GetAttribute("Player")
-            if tostring(ownerAttr) == player.Name then
-                cachedPlot = p
-                return p
+            if descendant.Name == "Owner" then
+                local isMatch = false
+                pcall(function()
+                    if descendant:IsA("StringValue") and descendant.Value == player.Name then
+                        isMatch = true
+                    end
+                end)
+                if descendant:GetAttribute("Owner") == player.Name then
+                    isMatch = true
+                end
+                if isMatch then
+                    return p
+                end
             end
         end
     end
@@ -601,20 +610,21 @@ local function startAutoCollectLoop()
                 pcall(function()
                     local CardRemote = ReplicatedStorage.Remotes:FindFirstChild("Card")
                     if CardRemote then
-                        -- Find plot once per sweep to avoid spamming workspace descendant search
-                        local myPlot = findMyPlot()
-                        
                         -- Sweep Pages 1 to maxPages
                         for page = 1, maxPages do
                             if not Config.AutoCollect then break end
-                            setDebug("Sweeping Page " .. page .. "/" .. maxPages .. "...")
                             
+                            local myPlot = findMyPlot()
                             if myPlot then
                                 local map = myPlot:FindFirstChild("Map")
                                 local display = map and map:FindFirstChild("Display")
                                 if display then
                                     local left = display:FindFirstChild("Left")
                                     local right = display:FindFirstChild("Right")
+                                    
+                                    local leftCount = left and #left:GetChildren() or 0
+                                    local rightCount = right and #right:GetChildren() or 0
+                                    setDebug(string.format("Page %d/%d (Plot: %s, Slots: %d)", page, maxPages, tostring(myPlot.Name), leftCount + rightCount))
                                     
                                     -- Instant sweep: Fire all remotes on the current page simultaneously (no type checks to prevent skipping card models)
                                     if left then
@@ -627,7 +637,11 @@ local function startAutoCollectLoop()
                                             CardRemote:FireServer("Collect", slot)
                                         end
                                     end
+                                else
+                                    setDebug(string.format("Page %d/%d (Display missing on plot %s)", page, maxPages, tostring(myPlot.Name)))
                                 end
+                            else
+                                setDebug(string.format("Page %d/%d (Plot not found!)", page, maxPages))
                             end
                             
                             task.wait(1.0) -- Wait 1.0s to let claims register cleanly and save CPU
