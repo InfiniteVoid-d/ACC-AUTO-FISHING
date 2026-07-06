@@ -838,14 +838,14 @@ local function handleCatch(eventType, fishName)
     recast()
 end
 
-local function handleEscape(reason)
+local function handleEscape()
     stopClicking()
     if Config.BlatantStrategy ~= "instant" then
         cancelInstantThread()
     end
     waitingForCatch = false
     setStatus("Escaped! Recasting...", Color3.fromRGB(255, 100, 0))
-    setDebug("Fish escaped: " .. tostring(reason or ""))
+    setDebug("Fish escaped")
     task.wait(Config.EscapeRecastDelay)
     if autoFishing then doCast() end
 end
@@ -880,7 +880,7 @@ local function startAutoFish()
             updateStats()
             handleCatch(eventType, fishName)
         elseif eventType == "FishEscaped" then
-            handleEscape(fishName)
+            handleEscape()
         elseif eventType == "EquipRod" or eventType == "OpenTreasure" then
             setDebug("Event: " .. tostring(eventType))
         elseif eventType == "Sold" then
