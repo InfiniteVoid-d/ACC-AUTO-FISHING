@@ -1027,11 +1027,10 @@ end
 -- =============================================
 -- ANTI-AFK
 -- =============================================
-local function checkAntiAFK()
+player.Idled:Connect(function()
     VirtualUser:CaptureController()
     VirtualUser:ClickButton2(Vector2.new())
-end
-player.Idled:Connect(checkAntiAFK)
+end)
 
 -- =============================================
 -- BUTTONS
