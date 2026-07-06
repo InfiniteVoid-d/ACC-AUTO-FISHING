@@ -545,7 +545,11 @@ local function cancelCollectThread()
     end
 end
 
+local cachedPlot = nil
 local function findMyPlot()
+    if cachedPlot and cachedPlot.Parent == workspace:FindFirstChild("Plots") then
+        return cachedPlot
+    end
     local plotsFolder = workspace:FindFirstChild("Plots")
     if not plotsFolder then return nil end
     for _, p in ipairs(plotsFolder:GetChildren()) do
@@ -553,10 +557,12 @@ local function findMyPlot()
             local val = nil
             pcall(function() val = descendant.Value end)
             if tostring(val) == player.Name or descendant.Name == player.Name then
+                cachedPlot = p
                 return p
             end
             local ownerAttr = descendant:GetAttribute("Owner") or descendant:GetAttribute("Player")
             if tostring(ownerAttr) == player.Name then
+                cachedPlot = p
                 return p
             end
         end
@@ -595,12 +601,14 @@ local function startAutoCollectLoop()
                 pcall(function()
                     local CardRemote = ReplicatedStorage.Remotes:FindFirstChild("Card")
                     if CardRemote then
-                        -- Sweep Pages 1 to maxPages (Assuming we start at Page 1, no initial LeftArrow spam)
+                        -- Find plot once per sweep to avoid spamming workspace descendant search
+                        local myPlot = findMyPlot()
+                        
+                        -- Sweep Pages 1 to maxPages
                         for page = 1, maxPages do
                             if not Config.AutoCollect then break end
                             setDebug("Sweeping Page " .. page .. "/" .. maxPages .. "...")
                             
-                            local myPlot = findMyPlot()
                             if myPlot then
                                 local map = myPlot:FindFirstChild("Map")
                                 local display = map and map:FindFirstChild("Display")
@@ -608,19 +616,15 @@ local function startAutoCollectLoop()
                                     local left = display:FindFirstChild("Left")
                                     local right = display:FindFirstChild("Right")
                                     
-                                    -- Instant sweep: Fire all 18 remotes on the current page simultaneously
+                                    -- Instant sweep: Fire all remotes on the current page simultaneously (no type checks to prevent skipping card models)
                                     if left then
                                         for _, slot in ipairs(left:GetChildren()) do
-                                            if slot:IsA("BasePart") and tonumber(slot.Name) then
-                                                CardRemote:FireServer("Collect", slot)
-                                            end
+                                            CardRemote:FireServer("Collect", slot)
                                         end
                                     end
                                     if right then
                                         for _, slot in ipairs(right:GetChildren()) do
-                                            if slot:IsA("BasePart") and tonumber(slot.Name) then
-                                                CardRemote:FireServer("Collect", slot)
-                                            end
+                                            CardRemote:FireServer("Collect", slot)
                                         end
                                     end
                                 end
