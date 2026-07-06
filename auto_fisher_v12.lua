@@ -590,8 +590,8 @@ local function startAutoCollectLoop()
                 end
             end)
             
-            -- 2. Card Binder Sweep (Runs dynamically with 45s cooldown AFTER sweep ends)
-            if tick() - lastCardCollect > 45 then
+            -- 2. Card Binder Sweep (Runs dynamically with 0s cooldown for continuous looping)
+            if tick() - lastCardCollect >= 0 then
                 pcall(function()
                     local CardRemote = ReplicatedStorage.Remotes:FindFirstChild("Card")
                     if CardRemote then
@@ -626,12 +626,12 @@ local function startAutoCollectLoop()
                                 end
                             end
                             
-                            task.wait(0.2) -- Wait for all 18 claims to register cleanly
+                            task.wait(1.0) -- Wait 1.0s to let claims register cleanly and save CPU
                             
                             -- Turn page or wrap around to Page 1 at the end
                             if not Config.AutoCollect then break end
                             CardRemote:FireServer("Page", "RightArrow")
-                            task.wait(0.2) -- Wait for page transition to complete
+                            task.wait(1.0) -- Wait 1.0s for page transition
                         end
                         setDebug("Card display sweep complete")
                     end
