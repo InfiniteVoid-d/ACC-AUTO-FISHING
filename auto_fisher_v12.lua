@@ -646,10 +646,21 @@ local function startAutoCollectLoop()
                             
                             task.wait(1.0) -- Wait 1.0s to let claims register cleanly and save CPU
                             
-                            -- Turn page or wrap around to Page 1 at the end
-                            if not Config.AutoCollect then break end
-                            CardRemote:FireServer("Page", "RightArrow")
-                            task.wait(1.0) -- Wait 1.0s for page transition
+                            -- Turn page if we haven't reached the end yet
+                            if page < maxPages then
+                                if not Config.AutoCollect then break end
+                                CardRemote:FireServer("Page", "RightArrow")
+                                task.wait(1.0) -- Wait 1.0s for page transition
+                            end
+                        end
+                        
+                        -- Reset binder back to Page 1 instantly on the server to prevent desync
+                        if Config.AutoCollect then
+                            setDebug("Resetting binder to Page 1...")
+                            for i = 1, maxPages - 1 do
+                                CardRemote:FireServer("Page", "LeftArrow")
+                            end
+                            task.wait(1.0) -- Let the server sync back to Page 1
                         end
                         setDebug("Card display sweep complete")
                     end
