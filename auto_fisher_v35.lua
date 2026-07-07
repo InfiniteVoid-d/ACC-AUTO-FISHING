@@ -1042,13 +1042,28 @@ local function stopAutoFish()
 end
 
 -- =============================================
--- ANTI-AFK
+-- ANTI-AFK (Android Mobile & PC Compatible)
 -- =============================================
-local function checkAntiAFK()
-    VirtualUser:CaptureController()
-    VirtualUser:ClickButton2(Vector2.new())
+local function bypassAFK()
+    pcall(function()
+        local vu = game:GetService("VirtualUser")
+        vu:CaptureController()
+        vu:ClickButton2(Vector2.new())
+        vu:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+        task.wait(0.2)
+        vu:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+    end)
 end
-player.Idled:Connect(checkAntiAFK)
+
+player.Idled:Connect(bypassAFK)
+
+-- Continuous background simulation loop to prevent AFK triggering on mobile
+task.spawn(function()
+    while true do
+        task.wait(120) -- Trigger screen interaction every 2 minutes
+        pcall(bypassAFK)
+    end
+end)
 
 -- =============================================
 -- BUTTONS
