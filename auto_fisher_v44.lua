@@ -849,7 +849,7 @@ end)
 
 local collectBtnToggle = createGridToggle("🪙 Collect Cash", UDim2.new(0, 0, 0, 50), UDim2.new(1, 0, 0, 20), Config.AutoCollect, function(val)
     Config.AutoCollect = val
-    if val then startAutoCollectLoop() else cancelCollectThread() end
+    if val then startAutoCollectLoop() else stopAutoCollectLoop() end
 end)
 
 local autoSellBtnToggle = createGridToggle("💰 Sell Duplicate Fish", UDim2.new(0, 0, 0, 75), UDim2.new(1, 0, 0, 20), Config.AutoSellDupes, function(val)
@@ -1035,88 +1035,41 @@ end
 
 local function startAutoCollectLoop()
     cancelCollectThread()
-    local lastCardCollect = 0
-    local maxPages = 30
-    
-    collectThread = task.spawn(function()
-        while Config.AutoCollect do
-            local char = player.Character
-            local root = char and char:FindFirstChild("HumanoidRootPart")
-            if root then
-                local drops = {}
-                pcall(function()
-                    for _, v in pairs(workspace:GetDescendants()) do
-                        if not Config.AutoCollect then break end
-                        if v:IsA("TouchTransmitter") and v.Parent then
-                            local name = v.Parent.Name:lower()
-                            if name:find("coin") or name:find("yen") or name:find("money") or name:find("gem") or name:find("drop") or name:find("cash") or name:find("gold") then
-                                table.insert(drops, v.Parent)
-                            end
-                        end
-                    end
-                end)
-                
-                for _, part in ipairs(drops) do
-                    if not Config.AutoCollect then break end
-                    pcall(function()
-                        firetouchinterest(root, part, 0)
-                        firetouchinterest(root, part, 1)
-                    end)
-                end
-            end
-            
-            if tick() - lastCardCollect >= 0 then
-                local CardRemote = nil
-                pcall(function() CardRemote = ReplicatedStorage.Remotes:FindFirstChild("Card") end)
-                
-                if CardRemote then
-                    for page = 1, maxPages do
-                        if not Config.AutoCollect then break end
-                        
-                        local myPlot = findMyPlot()
-                        if myPlot then
-                            local map = myPlot:FindFirstChild("Map")
-                            local display = map and map:FindFirstChild("Display")
-                            if display then
-                                local left = display:FindFirstChild("Left")
-                                local right = display:FindFirstChild("Right")
-                                
-                                if left then
-                                    for _, slot in ipairs(left:GetChildren()) do
-                                        pcall(function() CardRemote:FireServer("Collect", slot) end)
-                                    end
-                                end
-                                if right then
-                                    for _, slot in ipairs(right:GetChildren()) do
-                                        pcall(function() CardRemote:FireServer("Collect", slot) end)
-                                    end
-                                end
-                            end
-                        end
-                        
-                        task.wait(1.0)
-                        
-                        if page < maxPages then
-                            if not Config.AutoCollect then break end
-                            pcall(function() CardRemote:FireServer("Page", "RightArrow") end)
-                            task.wait(1.0)
-                        end
-                    end
-                    
-                    if Config.AutoCollect then
-                        setDebug("Resetting binder to Page 1...")
-                        for i = 1, maxPages - 1 do
-                            pcall(function() CardRemote:FireServer("Page", "LeftArrow") end)
-                        end
-                        task.wait(1.0)
-                    end
-                    setDebug("Card display sweep complete")
-                end
-                lastCardCollect = tick()
-            end
-            task.wait(1.5)
+    -- The game uses a server-side toggle via Card:FireServer("ToggleAutoCollect")
+    -- We just need to fire it once to enable, and once to disable
+    local CardRemote = nil
+    pcall(function() CardRemote = ReplicatedStorage.Remotes:FindFirstChild("Card") end)
+    if CardRemote then
+        -- Check if auto collect is already enabled
+        local currentState = false
+        pcall(function() currentState = ReplicatedData.GetData("AutoCollect") end)
+        
+        if not currentState then
+            -- Fire the toggle to enable it
+            pcall(function() CardRemote:FireServer("ToggleAutoCollect") end)
+            setDebug("Auto Collect: Enabled via server toggle")
+        else
+            setDebug("Auto Collect: Already enabled")
         end
-    end)
+    else
+        setDebug("Card remote not found!")
+    end
+end
+
+local function stopAutoCollectLoop()
+    cancelCollectThread()
+    -- Disable the server-side auto collect
+    local currentState = false
+    pcall(function() currentState = ReplicatedData.GetData("AutoCollect") end)
+    
+    if currentState then
+        local CardRemote = nil
+        pcall(function() CardRemote = ReplicatedStorage.Remotes:FindFirstChild("Card") end)
+        if CardRemote then
+            pcall(function() CardRemote:FireServer("ToggleAutoCollect") end)
+            setDebug("Auto Collect: Disabled via server toggle")
+        end
+    end
 end
 
 -- =============================================
