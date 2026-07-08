@@ -795,30 +795,19 @@ local function findFishHandlerLoop()
         return cachedFishHandler
     end
     
-    -- Try getgc first (highly stable and memory safe, avoids SEH crashes)
+    -- Use pure getgc search (highly stable, memory-safe, avoids SEH crashes entirely)
     local gcOk, gc = pcall(getgc)
     if gcOk and type(gc) == "table" then
         for _, v in pairs(gc) do
             if type(v) == "function" then
                 local ok, info = pcall(getinfo, v)
-                if ok and info and info.source and info.source:find("FishHandler") then
-                    cachedFishHandler = v
-                    return v
-                end
-            end
-        end
-    end
-    
-    -- Fallback to getconnections
-    local connOk, conns = pcall(getconnections, RunService.RenderStepped)
-    if connOk and type(conns) == "table" then
-        for _, conn in pairs(conns) do
-            local fn = conn.Function
-            if fn then
-                local ok, info = pcall(getinfo, fn)
-                if ok and info and info.source and info.source:find("FishHandler") then
-                    cachedFishHandler = fn
-                    return fn
+                if ok and info then
+                    local src = tostring(info.source or ""):lower()
+                    local shortSrc = tostring(info.short_src or ""):lower()
+                    if src:find("fishhandler") or shortSrc:find("fishhandler") then
+                        cachedFishHandler = v
+                        return v
+                    end
                 end
             end
         end
