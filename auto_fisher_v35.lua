@@ -587,91 +587,96 @@ local function startAutoCollectLoop()
     collectThread = task.spawn(function()
         while Config.AutoCollect do
             -- 1. Floor Drops Sweep (Runs in background every 1.5 seconds)
-            pcall(function()
-                local char = player.Character
-                local root = char and char:FindFirstChild("HumanoidRootPart")
-                if root then
+            local char = player.Character
+            local root = char and char:FindFirstChild("HumanoidRootPart")
+            if root then
+                local drops = {}
+                pcall(function()
                     for _, v in pairs(workspace:GetDescendants()) do
                         if not Config.AutoCollect then break end
                         if v:IsA("TouchTransmitter") and v.Parent then
                             local name = v.Parent.Name:lower()
                             if name:find("coin") or name:find("yen") or name:find("money") or name:find("gem") or name:find("drop") or name:find("cash") or name:find("gold") then
-                                firetouchinterest(root, v.Parent, 0)
-                                task.wait()
-                                firetouchinterest(root, v.Parent, 1)
+                                table.insert(drops, v.Parent)
                             end
                         end
                     end
+                end)
+                
+                for _, part in ipairs(drops) do
+                    if not Config.AutoCollect then break end
+                    pcall(function()
+                        firetouchinterest(root, part, 0)
+                        firetouchinterest(root, part, 1)
+                    end)
                 end
-            end)
+            end
             
             -- 2. Card Binder Sweep (Runs dynamically with 0s cooldown for continuous looping)
             if tick() - lastCardCollect >= 0 then
-                pcall(function()
-                    local CardRemote = ReplicatedStorage.Remotes:FindFirstChild("Card")
-                    if CardRemote then
-                        -- Sweep Pages 1 to maxPages
-                        for page = 1, maxPages do
-                            if not Config.AutoCollect then break end
-                            
-                            local myPlot = findMyPlot()
-                            if myPlot then
-                                local map = myPlot:FindFirstChild("Map")
-                                local display = map and map:FindFirstChild("Display")
-                                if display then
-                                    local left = display:FindFirstChild("Left")
-                                    local right = display:FindFirstChild("Right")
-                                    
-                                    local leftCount = left and #left:GetChildren() or 0
-                                    local rightCount = right and #right:GetChildren() or 0
-                                    setDebug(string.format("Page %d/%d (Plot: %s, Slots: %d)", page, maxPages, tostring(myPlot.Name), leftCount + rightCount))
-                                    
-                                    -- Instant sweep: Fire all remotes on the current page simultaneously (no type checks to prevent skipping card models)
-                                    if left then
-                                        for _, slot in ipairs(left:GetChildren()) do
-                                            CardRemote:FireServer("Collect", slot)
-                                        end
+                local CardRemote = nil
+                pcall(function() CardRemote = ReplicatedStorage.Remotes:FindFirstChild("Card") end)
+                
+                if CardRemote then
+                    -- Sweep Pages 1 to maxPages
+                    for page = 1, maxPages do
+                        if not Config.AutoCollect then break end
+                        
+                        local myPlot = findMyPlot()
+                        if myPlot then
+                            local map = myPlot:FindFirstChild("Map")
+                            local display = map and map:FindFirstChild("Display")
+                            if display then
+                                local left = display:FindFirstChild("Left")
+                                local right = display:FindFirstChild("Right")
+                                
+                                local leftCount = left and #left:GetChildren() or 0
+                                local rightCount = right and #right:GetChildren() or 0
+                                setDebug(string.format("Page %d/%d (Plot: %s, Slots: %d)", page, maxPages, tostring(myPlot.Name), leftCount + rightCount))
+                                
+                                -- Instant sweep: Fire all remotes on the current page simultaneously (no type checks to prevent skipping card models)
+                                if left then
+                                    for _, slot in ipairs(left:GetChildren()) do
+                                        pcall(function() CardRemote:FireServer("Collect", slot) end)
                                     end
-                                    if right then
-                                        for _, slot in ipairs(right:GetChildren()) do
-                                            CardRemote:FireServer("Collect", slot)
-                                        end
+                                end
+                                if right then
+                                    for _, slot in ipairs(right:GetChildren()) do
+                                        pcall(function() CardRemote:FireServer("Collect", slot) end)
                                     end
-                                else
-                                    setDebug(string.format("Page %d/%d (Display missing on plot %s)", page, maxPages, tostring(myPlot.Name)))
                                 end
                             else
-                                setDebug(string.format("Page %d/%d (Plot not found!)", page, maxPages))
+                                setDebug(string.format("Page %d/%d (Display missing on plot %s)", page, maxPages, tostring(myPlot.Name)))
                             end
-                            
-                            task.wait(1.0) -- Wait 1.0s to let claims register cleanly and save CPU
-                            
-                            -- Turn page if we haven't reached the end yet
-                            if page < maxPages then
-                                if not Config.AutoCollect then break end
-                                CardRemote:FireServer("Page", "RightArrow")
-                                task.wait(1.0) -- Wait 1.0s for page transition
-                            end
+                        else
+                            setDebug(string.format("Page %d/%d (Plot not found!)", page, maxPages))
                         end
                         
-                        -- Reset binder back to Page 1 instantly on the server to prevent desync
-                        if Config.AutoCollect then
-                            setDebug("Resetting binder to Page 1...")
-                            for i = 1, maxPages - 1 do
-                                CardRemote:FireServer("Page", "LeftArrow")
-                            end
-                            task.wait(1.0) -- Let the server sync back to Page 1
+                        task.wait(1.0) -- Safe yield outside pcall
+                        
+                        -- Turn page if we haven't reached the end yet
+                        if page < maxPages then
+                            if not Config.AutoCollect then break end
+                            pcall(function() CardRemote:FireServer("Page", "RightArrow") end)
+                            task.wait(1.0) -- Safe yield outside pcall
                         end
-                        setDebug("Card display sweep complete")
                     end
-                end)
+                    
+                    -- Reset binder back to Page 1 instantly on the server to prevent desync
+                    if Config.AutoCollect then
+                        setDebug("Resetting binder to Page 1...")
+                        for i = 1, maxPages - 1 do
+                            pcall(function() CardRemote:FireServer("Page", "LeftArrow") end)
+                        end
+                        task.wait(1.0) -- Safe yield outside pcall
+                    end
+                    setDebug("Card display sweep complete")
+                end
                 lastCardCollect = tick() -- Reset timer only AFTER the full sweep completes!
             end
             task.wait(1.5) -- Floor loop throttle
         end
     end)
-end
-
 -- =============================================
 -- DUPLICATES SELLING ENGINE
 -- =============================================
