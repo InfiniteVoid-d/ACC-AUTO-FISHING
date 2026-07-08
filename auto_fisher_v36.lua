@@ -1,8 +1,10 @@
 -- =============================================
--- Auto Fisher v36 - Crash Prevention Update
--- For: Anime Card Collection (Fish It!)
--- Author: LO + ENI
+-- CLEANUP OLD RUNNING THREADS / GLOBAL STATE
 -- =============================================
+if _G.StopAutoFisher then
+    pcall(_G.StopAutoFisher)
+    _G.StopAutoFisher = nil
+end
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -22,7 +24,7 @@ local Config = {
     Mode = "Blatant",
 
     -- Blatant strategy: "instant" | "turbo" | "hybrid" | "blatant"
-    BlatantStrategy = "instant",
+    BlatantStrategy = "blatant", -- Default to blatant to prevent SEH crashes on mobile executors
 
     -- Legit
     LegitClickDelay = 0.05,
@@ -77,6 +79,20 @@ local gpuActive = false
 local whiteScreen = nil
 
 local FishUI = PlayerGui:FindFirstChild("FishUI")
+
+_G.StopAutoFisher = function()
+    autoFishing = false
+    clicking = false
+    if connection then pcall(function() connection:Disconnect() end) end
+    if clickThread then pcall(task.cancel, clickThread) end
+    if safetyThread then pcall(task.cancel, safetyThread) end
+    if instantThread then pcall(task.cancel, instantThread) end
+    if autoSellThread then pcall(task.cancel, autoSellThread) end
+    if collectThread then pcall(task.cancel, collectThread) end
+    if uiConnection then pcall(function() uiConnection:Disconnect() end) end
+    lockUIHidden(false)
+    pcall(disableGPU)
+end
 
 -- =============================================
 -- CLEANUP OLD UI
@@ -821,6 +837,14 @@ end
 -- =============================================
 
 local function startInstantLoop()
+    local isMobile = UserInputService.TouchEnabled
+    if isMobile then
+        setDebug("Instant strategy disabled on mobile to prevent crashes.")
+        Config.BlatantStrategy = "blatant"
+        updateModeUI()
+        return
+    end
+    
     cancelInstantThread()
     instantThread = task.spawn(function()
         while autoFishing do
