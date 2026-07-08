@@ -782,24 +782,43 @@ local function recast()
 end
 
 -- =============================================
--- FIND FISH RES LOOP (Optimized with Caching)
+-- FIND FISH RES LOOP (Optimized getgc + getconnections)
 -- =============================================
 local cachedFishHandler = nil
 local function findFishHandlerLoop()
     if cachedFishHandler then
         return cachedFishHandler
     end
-    local conns = getconnections(RunService.RenderStepped)
-    for _, conn in pairs(conns) do
-        local fn = conn.Function
-        if fn then
-            local info = getinfo(fn)
-            if info and info.source and info.source:find("FishHandler") then
-                cachedFishHandler = fn
-                return fn
+    
+    -- Try getgc first (highly stable and memory safe, avoids SEH crashes)
+    local gcOk, gc = pcall(getgc)
+    if gcOk and type(gc) == "table" then
+        for _, v in pairs(gc) do
+            if type(v) == "function" then
+                local ok, info = pcall(getinfo, v)
+                if ok and info and info.source and info.source:find("FishHandler") then
+                    cachedFishHandler = v
+                    return v
+                end
             end
         end
     end
+    
+    -- Fallback to getconnections
+    local connOk, conns = pcall(getconnections, RunService.RenderStepped)
+    if connOk and type(conns) == "table" then
+        for _, conn in pairs(conns) do
+            local fn = conn.Function
+            if fn then
+                local ok, info = pcall(getinfo, fn)
+                if ok and info and info.source and info.source:find("FishHandler") then
+                    cachedFishHandler = fn
+                    return fn
+                end
+            end
+        end
+    end
+    
     return nil
 end
 
