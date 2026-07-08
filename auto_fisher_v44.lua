@@ -1732,10 +1732,14 @@ end)
 -- COLLAPSE & OVAL CAPSULE MINIMIZE CONTROL LOGIC
 -- =============================================
 local savedCapsulePos = nil  -- Remembers last capsule drag position
+local savedPanelPos = nil    -- Remembers last full panel drag position
 
 local function toggleMinimize(minimize)
     UICollapsed = minimize
     if UICollapsed then
+        -- Save panel position before shrinking
+        savedPanelPos = frame.Position
+        
         titleBar.Visible = false
         sidebar.Visible = false
         mainPanel.Visible = false
@@ -1756,21 +1760,21 @@ local function toggleMinimize(minimize)
         -- Save current capsule position before expanding
         savedCapsulePos = frame.Position
         
-        -- Calculate capsule center point, then re-center the expanded frame around it
-        local capsulePos = frame.Position
-        local capsuleCenterX = capsulePos.X.Offset + 20  -- half of 40px capsule
-        local capsuleCenterY = capsulePos.Y.Offset + 20
+        -- Restore panel to its last dragged position, or center on capsule if first time
+        if savedPanelPos then
+            frame.Position = savedPanelPos
+        else
+            local capsulePos = frame.Position
+            local capsuleCenterX = capsulePos.X.Offset + 20
+            local capsuleCenterY = capsulePos.Y.Offset + 20
+            local newX = capsuleCenterX - math.floor(originalWidth / 2)
+            local newY = capsuleCenterY - math.floor(originalHeight / 2)
+            local viewportSize = workspace.CurrentCamera.ViewportSize
+            newX = math.clamp(newX, 0, math.max(0, viewportSize.X - originalWidth))
+            newY = math.clamp(newY, 0, math.max(0, viewportSize.Y - originalHeight))
+            frame.Position = UDim2.new(0, newX, 0, newY)
+        end
         
-        -- Desired top-left so expanded frame is centered on capsule
-        local newX = capsuleCenterX - math.floor(originalWidth / 2)
-        local newY = capsuleCenterY - math.floor(originalHeight / 2)
-        
-        -- Clamp to viewport so it never goes off-screen
-        local viewportSize = workspace.CurrentCamera.ViewportSize
-        newX = math.clamp(newX, 0, math.max(0, viewportSize.X - originalWidth))
-        newY = math.clamp(newY, 0, math.max(0, viewportSize.Y - originalHeight))
-        
-        frame.Position = UDim2.new(0, newX, 0, newY)
         frame.Size = UDim2.new(0, originalWidth, 0, originalHeight)
         frameCorner.CornerRadius = UDim.new(0, 10)
         
