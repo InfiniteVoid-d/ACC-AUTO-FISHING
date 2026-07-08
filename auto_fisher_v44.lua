@@ -1731,6 +1731,8 @@ end)
 -- =============================================
 -- COLLAPSE & OVAL CAPSULE MINIMIZE CONTROL LOGIC
 -- =============================================
+local savedCapsulePos = nil  -- Remembers last capsule drag position
+
 local function toggleMinimize(minimize)
     UICollapsed = minimize
     if UICollapsed then
@@ -1742,9 +1744,17 @@ local function toggleMinimize(minimize)
         frame.Size = UDim2.new(0, 40, 0, 40)
         frameCorner.CornerRadius = UDim.new(0, 20)
         
+        -- Snap capsule back to last remembered position (if any)
+        if savedCapsulePos then
+            frame.Position = savedCapsulePos
+        end
+        
         minimizedBtn.Visible = true
     else
         minimizedBtn.Visible = false
+        
+        -- Save current capsule position before expanding
+        savedCapsulePos = frame.Position
         
         -- Calculate capsule center point, then re-center the expanded frame around it
         local capsulePos = frame.Position
