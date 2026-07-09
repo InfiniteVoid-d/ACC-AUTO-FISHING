@@ -12,6 +12,24 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local ReplicatedFirst = game:GetService("ReplicatedFirst")
+local MarketplaceService = game:GetService("MarketplaceService")
+
+-- Block Robux purchase prompts on client
+pcall(function()
+    local mt = getrawmetatable(game)
+    if mt then
+        setreadonly(mt, false)
+        local old = mt.__namecall
+        mt.__namecall = newcclosure(function(self, ...)
+            local method = getnamecallmethod()
+            if self == MarketplaceService and (method == "PromptProductPurchase" or method == "PromptPurchase" or method == "PromptGamePassPurchase") then
+                return
+            end
+            return old(self, ...)
+        end)
+        setreadonly(mt, true)
+    end
+end)
 
 local player = Players.LocalPlayer
 local PlayerGui = player.PlayerGui
@@ -25,6 +43,7 @@ local CardConfig = require(ReplicatedStorage.Modules.Config.Core.CardConfig)
 local PetConfig = require(ReplicatedStorage.Modules.Config.Core.PetConfig)
 local ReplicatedData = require(ReplicatedFirst:WaitForChild("ReplicatedData"))
 local FishHandler = require(ReplicatedStorage.Client.UI.FishHandler)
+local RaidHandler = require(ReplicatedStorage.Client.UI.RaidHandler)
 
 -- =============================================
 -- CONFIG
@@ -150,7 +169,7 @@ local modeLabel, stratLabel, statusLabel, statsLabel, modeBtn, stratBtn, toggleB
 local inputContainer, thresholdContainer, inputLabel, thresholdLabel, delayInputBox, thresholdInputBox, debugLabel
 local buyPacksBtn, beltSpeedBtn, sidebar, mainPanel, divider, frame, titleBar, minimizedBtn, frameCorner
 local gradeStatusLabel, gradeToggleBtn, gradeMethodBtn, gradeTargetBtn, gradeModeBtn, gradingCard, nameRow, targetRow, methodRow
-local wishTypeBtn, petEggTypeBtn, petRollMethodBtn, raidModeBtn, raidSelectedPackBtn, cardSelectedFn, codesBtn, gradeCardInputBox
+local wishTypeBtn, petEggTypeBtn, petRollMethodBtn, raidModeBtn, raidSelectedPackBtn, cardSelectedFn, codesBtn, gradeCardInputBox, raidTimerLabel
 
 -- Forward declarations of functions to resolve scoping/forward-reference issues
 local isPC, findMyPlot, shouldBuyPack, updateModeUI, setStatus, setDebug, updateStats, updateBeltSpeedSpoof
@@ -168,6 +187,17 @@ _G.StopAutoFisher = function()
     pcall(function()
         if FishHandler and FishHandler.InFishingArea then
             FishHandler.ExitFishingArea(true)
+        end
+    end)
+    pcall(function()
+        if RaidHandler then
+            local lobbyPos = Vector3.new(-536.8, -113.5, -250.9)
+            local char = player.Character
+            local root = char and char:FindFirstChild("HumanoidRootPart")
+            local inLobby = root and (root.Position - lobbyPos).Magnitude < 50
+            if inLobby then
+                RaidHandler.ExitRaidLobby()
+            end
         end
     end)
     if connection then pcall(function() connection:Disconnect() end) end
@@ -1039,10 +1069,22 @@ Instance.new("UICorner", petRollMethodBtn).CornerRadius = UDim.new(0, 4)
 -- AUTO RAID CARD (Y = 290, Height 110)
 -- =============================================
 do -- scope block to reduce top-level local register count
-local raidCard = createCard(automationTab, "AUTO RAID AUTOMATION", UDim2.new(1, -10, 0, 110), UDim2.new(0, 0, 0, 290))
+local raidCard = createCard(automationTab, "AUTO RAID AUTOMATION", UDim2.new(1, -10, 0, 130), UDim2.new(0, 0, 0, 290))
+
 
 createGridToggle(raidCard, "⚔️ Auto Join/Start Raids", UDim2.new(0, 0, 0, 20), UDim2.new(1, 0, 0, 18), Config.AutoRaid, function(val)
     Config.AutoRaid = val
+    if not val then
+        pcall(function()
+            local lobbyPos = Vector3.new(-536.8, -113.5, -250.9)
+            local char = player.Character
+            local root = char and char:FindFirstChild("HumanoidRootPart")
+            local inLobby = root and (root.Position - lobbyPos).Magnitude < 50
+            if inLobby then
+                RaidHandler.ExitRaidLobby()
+            end
+        end)
+    end
     if autoFishing or val then startAutoCollectTokensLoop() else cancelCollectTokensThread() end
 end)
 
@@ -1103,13 +1145,42 @@ raidSelectedPackBtn.TextSize = 8
 raidSelectedPackBtn.Font = Enum.Font.GothamBold
 raidSelectedPackBtn.Parent = rPackRow
 Instance.new("UICorner", raidSelectedPackBtn).CornerRadius = UDim.new(0, 4)
+
+-- Raid Timer Row
+local rTimerRow = Instance.new("Frame")
+rTimerRow.Size = UDim2.new(1, -16, 0, 20)
+rTimerRow.Position = UDim2.new(0, 0, 0, 94)
+rTimerRow.BackgroundTransparency = 1
+rTimerRow.Parent = raidCard
+
+local rtLabel = Instance.new("TextLabel")
+rtLabel.Size = UDim2.new(1, -105, 1, 0)
+rtLabel.Position = UDim2.new(0, 8, 0, 0)
+rtLabel.BackgroundTransparency = 1
+rtLabel.Text = "⏱️ Raid Cooldown:"
+rtLabel.TextColor3 = Color3.fromRGB(200, 200, 210)
+rtLabel.TextSize = 10
+rtLabel.TextXAlignment = Enum.TextXAlignment.Left
+rtLabel.Font = Enum.Font.Gotham
+rtLabel.Parent = rTimerRow
+
+raidTimerLabel = Instance.new("TextLabel")
+raidTimerLabel.Size = UDim2.new(0, 95, 0, 16)
+raidTimerLabel.Position = UDim2.new(1, -95, 0.5, -8)
+raidTimerLabel.BackgroundTransparency = 1
+raidTimerLabel.Text = "Cooldown: --:--"
+raidTimerLabel.TextColor3 = Color3.fromRGB(0, 220, 255)
+raidTimerLabel.TextSize = 10
+raidTimerLabel.TextXAlignment = Enum.TextXAlignment.Right
+raidTimerLabel.Font = Enum.Font.GothamBold
+raidTimerLabel.Parent = rTimerRow
 end -- end raid card scope block
 
--- Promo Code Redeemer Button (Y = 405)
+-- Promo Code Redeemer Button (Y = 425)
 do -- scope block for promo code button
 codesBtn = Instance.new("TextButton")
 codesBtn.Size = UDim2.new(1, -10, 0, 24)
-codesBtn.Position = UDim2.new(0, 0, 0, 405)
+codesBtn.Position = UDim2.new(0, 0, 0, 425)
 codesBtn.Text = "🎁 Redeem All Promo Codes"
 codesBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 codesBtn.BackgroundColor3 = Color3.fromRGB(70, 30, 120)
@@ -1124,10 +1195,10 @@ codesBtnStroke.Color = Color3.fromRGB(100, 50, 180)
 end -- end promo code scope block
 
 -- =============================================
--- AUTO CARD GRADING CARD (Y = 435)
+-- AUTO CARD GRADING CARD (Y = 455)
 -- =============================================
 do -- scope block for grading card UI
-gradingCard = createCard(automationTab, "AUTO CARD GRADING", UDim2.new(1, -10, 0, 180), UDim2.new(0, 0, 0, 435))
+gradingCard = createCard(automationTab, "AUTO CARD GRADING", UDim2.new(1, -10, 0, 180), UDim2.new(0, 0, 0, 455))
 
 -- Grading Mode Row
 local modeRow = Instance.new("Frame")
@@ -1459,6 +1530,34 @@ function updateStats()
     statsLabel.Text = string.format("Caught: %d | Sold: %d | Time: %dm", fishCaught, fishSold, elapsed)
 end
 
+-- Background task to continuously update the Raid Timer Label
+task.spawn(function()
+    while true do
+        pcall(function()
+            if raidTimerLabel then
+                local hasRaidStart = RaidHandler.VoteActive == true or RaidHandler.RaidActive == true or workspace:GetAttribute("RaidVoteTime") ~= nil
+                if hasRaidStart then
+                    raidTimerLabel.Text = "Active!"
+                    raidTimerLabel.TextColor3 = Color3.fromRGB(0, 255, 120)
+                else
+                    local StockHandler = require(ReplicatedStorage.Client.UI.StockHandler)
+                    local timeLeft = StockHandler.RaidTimeLeft or 0
+                    if timeLeft > 0 then
+                        local mins = math.floor(timeLeft / 60)
+                        local secs = math.floor(timeLeft % 60)
+                        raidTimerLabel.Text = string.format("%02d:%02d", mins, secs)
+                        raidTimerLabel.TextColor3 = Color3.fromRGB(0, 220, 255)
+                    else
+                        raidTimerLabel.Text = "00:00"
+                        raidTimerLabel.TextColor3 = Color3.fromRGB(150, 150, 160)
+                    end
+                end
+            end
+        end)
+        task.wait(1.0)
+    end
+end)
+
 -- =============================================
 -- CONVEYOR SPEED SPOOF ENGINE
 -- =============================================
@@ -1760,7 +1859,26 @@ function startAutoCollectTokensLoop()
             -- Auto Raid Logic (Dragon Ball III & Manga Cards Evolve Farming)
             if Config.AutoRaid then
                 pcall(function()
-                    local RaidHandler = require(ReplicatedStorage.Client.UI.RaidHandler)
+                    local lobbyPos = Vector3.new(-536.8, -113.5, -250.9)
+                    local char = player.Character
+                    local root = char and char:FindFirstChild("HumanoidRootPart")
+                    local inLobby = root and (root.Position - lobbyPos).Magnitude < 50
+                    
+                    local hasRaidStart = RaidHandler.VoteActive == true or RaidHandler.RaidActive == true or workspace:GetAttribute("RaidVoteTime") ~= nil
+                    
+                    if hasRaidStart then
+                        if not inLobby and not RaidHandler.InRaid then
+                            setDebug("Raid starting! Teleporting to Raid Lobby...")
+                            RaidHandler.EnterRaidLobby()
+                            task.wait(1.0)
+                        end
+                    else
+                        if inLobby and not RaidHandler.InRaid then
+                            setDebug("Raid in cooldown. Returning to base plot...")
+                            RaidHandler.ExitRaidLobby()
+                            task.wait(1.0)
+                        end
+                    end
                     
                     -- 1. Handling Voting & Start
                     if RaidHandler.VoteActive == true or workspace:GetAttribute("RaidVoteTime") ~= nil then
@@ -1818,7 +1936,7 @@ function startAutoCollectTokensLoop()
                             local ok, u = pcall(getupvalues, cardSelectedFn)
                             t3 = ok and u and u[1]
                         end
-                        if not t3 or type(t3) ~= "table" then
+                        if not t3 or type(t3) ~= "table" or #t3 == 0 then
                             t3 = getBestRaidCards()
                         end
                         
