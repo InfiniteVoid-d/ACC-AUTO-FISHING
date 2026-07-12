@@ -2379,9 +2379,66 @@ function startAutoSellLoop()
 end
 
 -- =============================================
--- CLICK ENGINE
+-- CLICK ENGINE (Non-cursor-hijacking)
 -- =============================================
+local cachedHoldBtn = nil
+
+local function findHoldButton()
+    if cachedHoldBtn and cachedHoldBtn.Parent then
+        return cachedHoldBtn
+    end
+    cachedHoldBtn = nil
+    pcall(function()
+        local fishUI = PlayerGui:FindFirstChild("Fishing") or PlayerGui:FindFirstChild("FishUI")
+        if fishUI then
+            for _, desc in ipairs(fishUI:GetDescendants()) do
+                if desc:IsA("TextButton") or desc:IsA("ImageButton") then
+                    local name = desc.Name:lower()
+                    if name:find("hold") or name:find("reel") or name:find("click") or name:find("catch") or name:find("tap") then
+                        cachedHoldBtn = desc
+                        return
+                    end
+                end
+            end
+            -- Fallback: find the largest visible button in the fishing UI
+            local bestBtn = nil
+            local bestArea = 0
+            for _, desc in ipairs(fishUI:GetDescendants()) do
+                if (desc:IsA("TextButton") or desc:IsA("ImageButton")) and desc.Visible then
+                    local absSize = desc.AbsoluteSize
+                    local area = absSize.X * absSize.Y
+                    if area > bestArea then
+                        bestArea = area
+                        bestBtn = desc
+                    end
+                end
+            end
+            cachedHoldBtn = bestBtn
+        end
+    end)
+    return cachedHoldBtn
+end
+
 function simulateClick()
+    -- Strategy 1: Programmatic fireclick on the FishUI hold button (no cursor hijack)
+    local holdBtn = findHoldButton()
+    if holdBtn then
+        pcall(function()
+            if firesignal then
+                firesignal(holdBtn.MouseButton1Click)
+                firesignal(holdBtn.MouseButton1Down)
+                task.wait(0.01)
+                firesignal(holdBtn.MouseButton1Up)
+            elseif fireclick then
+                fireclick(holdBtn)
+            else
+                holdBtn.MouseButton1Click:Fire()
+            end
+        end)
+        return
+    end
+    
+    -- Strategy 2: Fallback to VIM only if no button was found (rare edge case)
     local vim = nil
     pcall(function() vim = game:GetService("VirtualInputManager") end)
     if vim then
@@ -2398,6 +2455,7 @@ function startClicking(delay)
     if clicking then return end
     clicking = true
     clickCount = 0
+    cachedHoldBtn = nil -- Force re-scan when clicking starts
     clickThread = task.spawn(function()
         while clicking and autoFishing do
             simulateClick()
@@ -2416,6 +2474,7 @@ function stopClicking()
         pcall(task.cancel, clickThread)
         clickThread = nil
     end
+    cachedHoldBtn = nil
     pcall(function()
         local VirtualInputManager = game:GetService("VirtualInputManager")
         VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
@@ -2655,6 +2714,22 @@ task.spawn(function()
     while true do
         task.wait(120)
         bypassAFK()
+    end
+end)
+
+-- =============================================
+-- KEYBOARD HOTKEY: F6 to Toggle Auto Fish
+-- =============================================
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.F6 then
+        if autoFishing then
+            stopAutoFish()
+            setDebug("[F6] Stopped auto fishing")
+        else
+            startAutoFish()
+            setDebug("[F6] Started auto fishing")
+        end
     end
 end)
 
