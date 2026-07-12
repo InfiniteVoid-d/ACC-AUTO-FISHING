@@ -2379,73 +2379,22 @@ function startAutoSellLoop()
 end
 
 -- =============================================
--- CLICK ENGINE (Non-cursor-hijacking)
+-- CLICK ENGINE (Viewport-targeted, non-UI-hijacking)
 -- =============================================
-local cachedHoldBtn = nil
-
-local function findHoldButton()
-    if cachedHoldBtn and cachedHoldBtn.Parent then
-        return cachedHoldBtn
-    end
-    cachedHoldBtn = nil
-    pcall(function()
-        local fishUI = PlayerGui:FindFirstChild("Fishing") or PlayerGui:FindFirstChild("FishUI")
-        if fishUI then
-            for _, desc in ipairs(fishUI:GetDescendants()) do
-                if desc:IsA("TextButton") or desc:IsA("ImageButton") then
-                    local name = desc.Name:lower()
-                    if name:find("hold") or name:find("reel") or name:find("click") or name:find("catch") or name:find("tap") then
-                        cachedHoldBtn = desc
-                        return
-                    end
-                end
-            end
-            -- Fallback: find the largest visible button in the fishing UI
-            local bestBtn = nil
-            local bestArea = 0
-            for _, desc in ipairs(fishUI:GetDescendants()) do
-                if (desc:IsA("TextButton") or desc:IsA("ImageButton")) and desc.Visible then
-                    local absSize = desc.AbsoluteSize
-                    local area = absSize.X * absSize.Y
-                    if area > bestArea then
-                        bestArea = area
-                        bestBtn = desc
-                    end
-                end
-            end
-            cachedHoldBtn = bestBtn
-        end
-    end)
-    return cachedHoldBtn
-end
-
 function simulateClick()
-    -- Strategy 1: Programmatic fireclick on the FishUI hold button (no cursor hijack)
-    local holdBtn = findHoldButton()
-    if holdBtn then
-        pcall(function()
-            if firesignal then
-                firesignal(holdBtn.MouseButton1Click)
-                firesignal(holdBtn.MouseButton1Down)
-                task.wait(0.01)
-                firesignal(holdBtn.MouseButton1Up)
-            elseif fireclick then
-                fireclick(holdBtn)
-            else
-                holdBtn.MouseButton1Click:Fire()
-            end
-        end)
-        return
-    end
-    
-    -- Strategy 2: Fallback to VIM only if no button was found (rare edge case)
     local vim = nil
     pcall(function() vim = game:GetService("VirtualInputManager") end)
     if vim then
+        -- Click at bottom-center of viewport, far from auto-fisher UI (center of screen)
+        -- The fishing minigame captures input globally via UserInputService, so position doesn't matter
+        -- for the game — but it DOES matter for not hitting our own UI buttons.
+        local vp = workspace.CurrentCamera.ViewportSize
+        local clickX = vp.X * 0.5
+        local clickY = vp.Y * 0.85 -- Bottom 15% of screen, well below center where our UI sits
         pcall(function()
-            vim:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+            vim:SendMouseButtonEvent(clickX, clickY, 0, true, game, 0)
             RunService.RenderStepped:Wait()
-            vim:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+            vim:SendMouseButtonEvent(clickX, clickY, 0, false, game, 0)
         end)
     end
 end
@@ -2455,13 +2404,13 @@ function startClicking(delay)
     if clicking then return end
     clicking = true
     clickCount = 0
-    cachedHoldBtn = nil -- Force re-scan when clicking starts
     clickThread = task.spawn(function()
         while clicking and autoFishing do
             simulateClick()
             clickCount = clickCount + 1
-            if clickCount % 10 == 0 then
-                task.wait(0.08)
+            -- Breathing gap: every 15 clicks, pause briefly so real user input can get through
+            if clickCount % 15 == 0 then
+                task.wait(0.12)
             end
             task.wait(delay or Config.LegitClickDelay)
         end
@@ -2474,10 +2423,10 @@ function stopClicking()
         pcall(task.cancel, clickThread)
         clickThread = nil
     end
-    cachedHoldBtn = nil
     pcall(function()
-        local VirtualInputManager = game:GetService("VirtualInputManager")
-        VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+        local vim = game:GetService("VirtualInputManager")
+        local vp = workspace.CurrentCamera.ViewportSize
+        vim:SendMouseButtonEvent(vp.X * 0.5, vp.Y * 0.85, 0, false, game, 0)
     end)
 end
 
