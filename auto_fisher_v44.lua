@@ -14,7 +14,7 @@ local UserInputService = game:GetService("UserInputService")
 local ReplicatedFirst = game:GetService("ReplicatedFirst")
 local MarketplaceService = game:GetService("MarketplaceService")
 
--- Block Robux purchase prompts on client
+-- Block Robux purchase prompts and FishEscaped signals on client
 pcall(function()
     local mt = getrawmetatable(game)
     if mt then
@@ -22,9 +22,21 @@ pcall(function()
         local old = mt.__namecall
         mt.__namecall = newcclosure(function(self, ...)
             local method = getnamecallmethod()
+            local args = {...}
+            
+            -- Blocker 1: Robux prompt purchase protection
             if self == MarketplaceService and (method == "PromptProductPurchase" or method == "PromptPurchase" or method == "PromptGamePassPurchase") then
                 return
             end
+            
+            -- Blocker 2: Auto-fishing escape blocker
+            local selfName = pcall(function() return self.Name end) and self.Name
+            if selfName and tostring(selfName):lower() == "fish" and (method == "FireServer" or method == "fireServer") and args[1] == "FishEscaped" then
+                if autoFishing and Config and Config.BlatantStrategy == "instant" then
+                    return
+                end
+            end
+            
             return old(self, ...)
         end)
         setreadonly(mt, true)
@@ -64,7 +76,7 @@ local Config = {
     BlatantHybridDelay = 3.5,
     
     -- Instant/Blatant Catch Delay settings:
-    InstantCatchDelay = 2.2,     -- Default delay before catch (e.g. 2.2s struggle)
+    InstantCatchDelay = 1.2,     -- Default delay before catch (e.g. 1.2s struggle)
     SlowReelThreshold = 0.91,     -- Target struggle percentage (default 91% or 0.91)
     
     BlatantRecastDelay = 0.05,   -- Recast delay between catches (default 0.05s)
@@ -95,6 +107,10 @@ local Config = {
     AutoRaid = false,
     RaidMode = "Auto Select",
     RaidSelectedPack = "Pirate",
+
+    -- Auto Voyage settings (Latest update feature)
+    AutoVoyage = false,
+    VoyageSelectedPack = "Pirate",
 
     -- Auto Buy card packs as they spawn on conveyor
     AutoBuyPacks = false,
@@ -169,14 +185,14 @@ local modeLabel, stratLabel, statusLabel, statsLabel, modeBtn, stratBtn, toggleB
 local inputContainer, thresholdContainer, inputLabel, thresholdLabel, delayInputBox, thresholdInputBox, debugLabel
 local buyPacksBtn, beltSpeedBtn, sidebar, mainPanel, divider, frame, titleBar, minimizedBtn, frameCorner
 local gradeStatusLabel, gradeToggleBtn, gradeMethodBtn, gradeTargetBtn, gradeModeBtn, gradingCard, nameRow, targetRow, methodRow
-local wishTypeBtn, petEggTypeBtn, petRollMethodBtn, raidModeBtn, raidSelectedPackBtn, cardSelectedFn, codesBtn, gradeCardInputBox, raidTimerLabel
+local wishTypeBtn, petEggTypeBtn, petRollMethodBtn, raidModeBtn, raidSelectedPackBtn, cardSelectedFn, codesBtn, gradeCardInputBox, raidTimerLabel, voyageSelectedPackBtn
 
 -- Forward declarations of functions to resolve scoping/forward-reference issues
 local isPC, findMyPlot, shouldBuyPack, updateModeUI, setStatus, setDebug, updateStats, updateBeltSpeedSpoof
 local cancelCollectThread, startAutoCollectLoop, stopAutoCollectLoop, cancelCollectTokensThread, startAutoCollectTokensLoop
 local cancelAutoBuyPacksThread, startAutoBuyPacksLoop, cancelAutoRelicsThread, startAutoRelicsLoop, redeemAllCodes
 local getInventory, sellDuplicates, cancelAutoSellThread, startAutoSellLoop, simulateClick, startClicking, stopClicking
-local cancelInstantThread, doCast, recast, findFishHandlerLoop, startInstantLoop, strategyTurbo, strategyHybrid
+local cancelInstantThread, doCast, recast, strategyTurbo, strategyHybrid
 local handleStartFishing, handleCatch, handleEscape, startAutoFish, stopAutoFish, bypassAFK, toggleMinimize, startDrag
 local enableGPU, disableGPU, lockUIHidden, startAutoGrading, stopAutoGrading, getGradeIndex, updateGradingUI, rollCard, getBestRaidCards
 
@@ -420,7 +436,7 @@ automationTab.Position = UDim2.new(0, 10, 0, 10)
 automationTab.BackgroundTransparency = 1
 automationTab.BorderSizePixel = 0
 automationTab.ScrollBarThickness = 4
-automationTab.CanvasSize = UDim2.new(0, 0, 0, 680)
+automationTab.CanvasSize = UDim2.new(0, 0, 0, 820)
 automationTab.Parent = mainPanel
 tabFrames["Automation"] = automationTab
 
@@ -1337,9 +1353,64 @@ gradeStatusLabel.Font = Enum.Font.Gotham
 gradeStatusLabel.Parent = gradingCard
 end -- end grading card scope block
 
+-- =============================================
+-- AUTO VOYAGE CARD (Y = 660, Height 110)
+-- =============================================
+do -- scope block for Voyage UI
+local voyageCard = createCard(automationTab, "AUTO VOYAGE AUTOMATION", UDim2.new(1, -10, 0, 110), UDim2.new(0, 0, 0, 660))
+
+createGridToggle(voyageCard, "⚓ Auto Voyages", UDim2.new(0, 0, 0, 20), UDim2.new(1, 0, 0, 18), Config.AutoVoyage, function(val)
+    Config.AutoVoyage = val
+    if autoFishing or val then startAutoCollectTokensLoop() else cancelCollectTokensThread() end
+end)
+
+-- Voyage Pack Row
+local vPackRow = Instance.new("Frame")
+vPackRow.Size = UDim2.new(1, -16, 0, 20)
+vPackRow.Position = UDim2.new(0, 0, 0, 42)
+vPackRow.BackgroundTransparency = 1
+vPackRow.Parent = voyageCard
+
+local vpLabel = Instance.new("TextLabel")
+vpLabel.Size = UDim2.new(1, -105, 1, 0)
+vpLabel.Position = UDim2.new(0, 8, 0, 0)
+vpLabel.BackgroundTransparency = 1
+vpLabel.Text = "⚓ Target Voyage Pack:"
+vpLabel.TextColor3 = Color3.fromRGB(200, 200, 210)
+vpLabel.TextSize = 10
+vpLabel.TextXAlignment = Enum.TextXAlignment.Left
+vpLabel.Font = Enum.Font.Gotham
+vpLabel.Parent = vPackRow
+
+voyageSelectedPackBtn = Instance.new("TextButton")
+voyageSelectedPackBtn.Size = UDim2.new(0, 95, 0, 16)
+voyageSelectedPackBtn.Position = UDim2.new(1, -95, 0.5, -8)
+voyageSelectedPackBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+voyageSelectedPackBtn.Text = "Pack: Pirate"
+voyageSelectedPackBtn.TextColor3 = Color3.fromRGB(0, 220, 255)
+voyageSelectedPackBtn.TextSize = 8
+voyageSelectedPackBtn.Font = Enum.Font.GothamBold
+voyageSelectedPackBtn.Parent = vPackRow
+Instance.new("UICorner", voyageSelectedPackBtn).CornerRadius = UDim.new(0, 4)
+
+local function updateVoyagePackUI()
+    voyageSelectedPackBtn.Text = "Pack: " .. Config.VoyageSelectedPack
+end
+
+local voyagePacks = {"Pirate", "Marine", "Kingdom", "Shinobi", "Curse", "Hero", "Wizard"}
+voyageSelectedPackBtn.MouseButton1Click:Connect(function()
+    local currentIdx = table.find(voyagePacks, Config.VoyageSelectedPack) or 1
+    local nextIdx = (currentIdx % #voyagePacks) + 1
+    Config.VoyageSelectedPack = voyagePacks[nextIdx]
+    updateVoyagePackUI()
+end)
+
+updateVoyagePackUI()
+end -- end voyage card scope block
+
 -- Track the dynamic content size to expand scroll height if items change
 automationTab:GetPropertyChangedSignal("AbsoluteWindowSize"):Connect(function()
-    automationTab.CanvasSize = UDim2.new(0, 0, 0, 680)
+    automationTab.CanvasSize = UDim2.new(0, 0, 0, 820)
 end)
 
 
@@ -1722,16 +1793,13 @@ end
 -- Get best 3 cards eligible for Raids
 function getBestRaidCards()
     local cards = ReplicatedData.GetData("Cards") or {}
-    local discovered = ReplicatedData.GetData("CardsDiscovered") or {}
     
     local eligible = {}
     for name, data in pairs(cards) do
-        if table.find(discovered, name) then
-            local gradeScore = getGradeIndex(data.Grade or "F")
-            local levelScore = data.Level or 1
-            local score = gradeScore * 1000 + levelScore
-            table.insert(eligible, {Name = name, Score = score})
-        end
+        local gradeScore = getGradeIndex(data.Grade or "F")
+        local levelScore = data.Level or 1
+        local score = gradeScore * 1000 + levelScore
+        table.insert(eligible, {Name = name, Score = score})
     end
     
     table.sort(eligible, function(a, b) return a.Score > b.Score end)
@@ -1746,7 +1814,7 @@ end
 function startAutoCollectTokensLoop()
     cancelCollectTokensThread()
     collectTokensThread = task.spawn(function()
-        while Config.AutoCollectTokens or Config.AutoCollectDragonBalls or Config.AutoWish or Config.AutoRollPets or Config.AutoRaid do
+        while Config.AutoCollectTokens or Config.AutoCollectDragonBalls or Config.AutoWish or Config.AutoRollPets or Config.AutoRaid or Config.AutoVoyage do
             -- Collect Map Tokens & Potions
             if Config.AutoCollectTokens then
                 local tag = player.Name .. "Token"
@@ -1864,7 +1932,9 @@ function startAutoCollectTokensLoop()
                     local root = char and char:FindFirstChild("HumanoidRootPart")
                     local inLobby = root and (root.Position - lobbyPos).Magnitude < 50
                     
-                    local hasRaidStart = RaidHandler.VoteActive == true or RaidHandler.RaidActive == true or workspace:GetAttribute("RaidVoteTime") ~= nil
+                    local StockHandler = require(ReplicatedStorage.Client.UI.StockHandler)
+                    local cooldownLeft = StockHandler and StockHandler.RaidTimeLeft or 300
+                    local hasRaidStart = RaidHandler.VoteActive == true or RaidHandler.RaidActive == true or workspace:GetAttribute("RaidVoteTime") ~= nil or cooldownLeft <= 0
                     
                     if hasRaidStart then
                         if not inLobby and not RaidHandler.InRaid then
@@ -1912,33 +1982,8 @@ function startAutoCollectTokensLoop()
                     end
                     
                     -- 2. Handling Joining
-                    if RaidHandler.RaidActive == true and RaidHandler.InRaid == false then
-                        -- Fetch selected cards upvalue table from client
-                        if getgc and not cardSelectedFn then
-                            pcall(function()
-                                for _, v in pairs(getgc()) do
-                                    if type(v) == "function" then
-                                        local info = getinfo(v)
-                                        if info and tostring(info.source):lower():find("raidhandler") then
-                                            local ups = getupvalues(v)
-                                            if ups and type(ups[1]) == "table" then
-                                                cardSelectedFn = v
-                                                break
-                                            end
-                                        end
-                                    end
-                                end
-                            end)
-                        end
-
-                        local t3 = nil
-                        if getupvalues and cardSelectedFn then
-                            local ok, u = pcall(getupvalues, cardSelectedFn)
-                            t3 = ok and u and u[1]
-                        end
-                        if not t3 or type(t3) ~= "table" or #t3 == 0 then
-                            t3 = getBestRaidCards()
-                        end
+                    if inLobby and RaidHandler.InRaid == false and workspace:GetAttribute("RaidVoteTime") == nil then
+                        local t3 = getBestRaidCards()
                         
                         if t3 and type(t3) == "table" and #t3 > 0 then
                             if #t3 < 3 then
@@ -1962,6 +2007,41 @@ function startAutoCollectTokensLoop()
                     if resultsFrame and resultsFrame.Visible == true then
                         setDebug("Raid completed! Closing results...")
                         pcall(function() RaidHandler.ContinueClicked() end)
+                        task.wait(1.0)
+                    end
+                end)
+            end
+
+            -- Auto Voyage Logic (Latest update feature)
+            if Config.AutoVoyage then
+                pcall(function()
+                    local VoyageHandler = require(ReplicatedStorage.Client.UI.VoyageHandler)
+                    local VoyageConfig = require(ReplicatedStorage.Modules.Config.Core.VoyageConfig)
+                    
+                    local VoyageTime = ReplicatedData.GetData("VoyageTime") or 0
+                    local serverTime = workspace:GetServerTimeNow()
+                    local cooldown = VoyageConfig.GetVoyageCooldown(ReplicatedData.GetReplica())
+                    local inCooldown = serverTime - VoyageTime < cooldown
+                    
+                    local inBattle = VoyageHandler.InBattle == true
+                    local inVoyageShip = VoyageHandler.InVoyageShip == true
+                    
+                    if not inCooldown and not inBattle and not inVoyageShip then
+                        setDebug("Voyage cooldown ended. Starting new Voyage...")
+                        pcall(function()
+                            VoyageHandler.ContinueClicked()
+                            ReplicatedStorage.Remotes.Voyage:FireServer("Start", Config.VoyageSelectedPack)
+                            VoyageHandler.EnterShip()
+                        end)
+                        task.wait(2.0)
+                    end
+                    
+                    -- Close results when finished
+                    local voyageGui = PlayerGui:FindFirstChild("Voyage")
+                    local resultsFrame = voyageGui and voyageGui:FindFirstChild("Frame") and voyageGui.Frame:FindFirstChild("Results")
+                    if resultsFrame and resultsFrame.Visible == true then
+                        setDebug("Voyage finished! Closing results...")
+                        pcall(function() VoyageHandler.ContinueClicked() end)
                         task.wait(1.0)
                     end
                 end)
@@ -2358,144 +2438,7 @@ function recast()
     end
 end
 
-local cachedFishHandler = nil
-function findFishHandlerLoop()
-    if cachedFishHandler then
-        return cachedFishHandler
-    end
-    
-    local connOk, conns = pcall(getconnections, RunService.RenderStepped)
-    if connOk and type(conns) == "table" then
-        for _, conn in pairs(conns) do
-            local fn = conn.Function
-            if fn then
-                local ok, info = pcall(getinfo, fn)
-                if ok and info then
-                    local src = tostring(info.source or ""):lower()
-                    local shortSrc = tostring(info.short_src or ""):lower()
-                    if src:find("fishhandler") or shortSrc:find("fishhandler") then
-                        local upOk, ups = pcall(getupvalues, fn)
-                        if upOk and ups and ups[6] ~= nil then
-                            cachedFishHandler = fn
-                            return fn
-                        end
-                    end
-                end
-            end
-        end
-    end
-    
-    local gcOk, gc = pcall(getgc)
-    if gcOk and type(gc) == "table" then
-        for _, v in pairs(gc) do
-            if type(v) == "function" then
-                local ok, info = pcall(getinfo, v)
-                if ok and info then
-                    local src = tostring(info.source or ""):lower()
-                    local shortSrc = tostring(info.short_src or ""):lower()
-                    if src:find("fishhandler") or shortSrc:find("fishhandler") then
-                        local upOk, ups = pcall(getupvalues, v)
-                        if upOk and ups and ups[6] ~= nil then
-                            cachedFishHandler = v
-                            return v
-                        end
-                    end
-                end
-            end
-        end
-    end
-    
-    return nil
-end
 
--- =============================================
--- STRATEGIES
--- =============================================
-function startInstantLoop()
-    if not isPC() then
-        setDebug("Instant strategy disabled on mobile to prevent crashes.")
-        Config.BlatantStrategy = "blatant"
-        updateModeUI()
-        return
-    end
-    
-    cancelInstantThread()
-    local activeIdx = nil
-    local scoreIdx = nil
-    local goalIdx = nil
-    
-    instantThread = task.spawn(function()
-        while autoFishing do
-            local fn = findFishHandlerLoop()
-            if fn then
-                local ok, ups = pcall(getupvalues, fn)
-                if ok and ups then
-                    -- Dynamically detect upvalue indices
-                    if not activeIdx or not scoreIdx or not goalIdx then
-                        for i, v in ipairs(ups) do
-                            if type(v) == "boolean" then
-                                activeIdx = i
-                                break
-                            end
-                        end
-                        
-                        for i, v in ipairs(ups) do
-                            if type(v) == "number" and v >= 50 and v <= 500 then
-                                goalIdx = i
-                                break
-                            end
-                        end
-                        
-                        if goalIdx then
-                            local goalVal = ups[goalIdx]
-                            for i, v in ipairs(ups) do
-                                if i ~= goalIdx and type(v) == "number" and v >= 0 and v <= goalVal then
-                                    scoreIdx = i
-                                    break
-                                end
-                            end
-                        end
-                    end
-                    
-                    local currentActiveIdx = activeIdx or 1
-                    local currentScoreIdx = scoreIdx or 6
-                    local currentGoalIdx = goalIdx or 8
-                    
-                    local isMinigameActive = ups[currentActiveIdx]
-                    if isMinigameActive == true then
-                        local goalScore = ups[currentGoalIdx]
-                        if goalScore then
-                            setStatus("🚀 INSTANT: Struggle...", Color3.fromRGB(0, 220, 150))
-                            setDebug("Freezing progress at " .. (Config.SlowReelThreshold * 100) .. "%...")
-                            
-                            local freezeEnd = tick() + Config.InstantCatchDelay
-                            while tick() < freezeEnd and autoFishing do
-                                pcall(setupvalue, fn, currentScoreIdx, goalScore * Config.SlowReelThreshold)
-                                RunService.Heartbeat:Wait()
-                            end
-                            if not autoFishing then break end
-                            
-                            setDebug("Completing catch...")
-                            while autoFishing do
-                                local currentFn = findFishHandlerLoop()
-                                if not currentFn then break end
-                                local upOk, currentUps = pcall(getupvalues, currentFn)
-                                if not upOk or not currentUps or currentUps[currentActiveIdx] == false then break end
-                                
-                                pcall(setupvalue, currentFn, currentScoreIdx, goalScore + 0.1)
-                                RunService.Heartbeat:Wait()
-                            end
-                            
-                            setStatus("Caught!", Color3.fromRGB(100, 220, 255))
-                            setDebug("Cycle complete")
-                        end
-                    end
-                end
-            end
-            task.wait(0.1)
-        end
-    end)
-end
 
 function strategyTurbo(fishName)
     setStatus("⚡ TURBO: " .. tostring(fishName), Color3.fromRGB(0, 180, 255))
@@ -2524,7 +2467,14 @@ function handleStartFishing(fishName)
     if Config.Mode == "Blatant" then
         local strat = Config.BlatantStrategy
         if strat == "instant" then
-            setDebug("Waiting for bite (3-7s delay)...")
+            task.spawn(function()
+                setStatus("🚀 INSTANT: Catching...", Color3.fromRGB(0, 220, 150))
+                setDebug("Waiting catch delay...")
+                task.wait(Config.InstantCatchDelay)
+                if not autoFishing then return end
+                setDebug("Firing FishCaught remote...")
+                pcall(Fish.FireServer, Fish, "FishCaught")
+            end)
         elseif strat == "turbo" then
             strategyTurbo(fishName)
         elseif strat == "hybrid" then
@@ -2617,9 +2567,7 @@ function startAutoFish()
         end
     end)
 
-    if Config.BlatantStrategy == "instant" then
-        startInstantLoop()
-    end
+
 
     task.spawn(function()
         task.wait(0.3)
