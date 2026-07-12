@@ -14,6 +14,10 @@ local UserInputService = game:GetService("UserInputService")
 local ReplicatedFirst = game:GetService("ReplicatedFirst")
 local MarketplaceService = game:GetService("MarketplaceService")
 
+-- Forward declare local variables that need to be in scope for the hook below
+local autoFishing = false
+local Config
+
 -- Block Robux purchase prompts and FishEscaped signals on client
 pcall(function()
     local mt = getrawmetatable(game)
@@ -60,7 +64,7 @@ local RaidHandler = require(ReplicatedStorage.Client.UI.RaidHandler)
 -- =============================================
 -- CONFIG
 -- =============================================
-local Config = {
+Config = {
     Mode = "Blatant",
 
     -- Blatant strategy: "instant" | "turbo" | "hybrid" | "blatant"
@@ -143,7 +147,7 @@ end
 -- =============================================
 -- STATE
 -- =============================================
-local autoFishing = false
+autoFishing = false
 local clicking = false
 local connection = nil
 local clickThread = nil
@@ -957,7 +961,7 @@ end)
 createGridToggle(autoCard, "🪙 Collect Map Tokens", UDim2.new(0, 0, 0, 74), UDim2.new(1, 0, 0, 18), Config.AutoCollectTokens, function(val)
     Config.AutoCollectTokens = val
     if autoFishing then
-        if val then startAutoCollectTokensLoop() else cancelCollectTokensThread() end
+        startAutoCollectTokensLoop()
     end
 end)
 
@@ -969,14 +973,14 @@ end)
 createGridToggle(autoCard, "🐉 Collect Dragon Balls", UDim2.new(0, 0, 0, 110), UDim2.new(1, 0, 0, 18), Config.AutoCollectDragonBalls, function(val)
     Config.AutoCollectDragonBalls = val
     if autoFishing then
-        if val then startAutoCollectTokensLoop() else cancelCollectTokensThread() end
+        startAutoCollectTokensLoop()
     end
 end)
 
 createGridToggle(autoCard, "🐉 Auto Wish (Shenron)", UDim2.new(0, 0, 0, 128), UDim2.new(1, 0, 0, 18), Config.AutoWish, function(val)
     Config.AutoWish = val
     if autoFishing then
-        if val then startAutoCollectTokensLoop() else cancelCollectTokensThread() end
+        startAutoCollectTokensLoop()
     end
 end)
 
@@ -1018,7 +1022,7 @@ local petEggCard = createCard(automationTab, "PET EGG ROLLING", UDim2.new(1, -10
 createGridToggle(petEggCard, "🐾 Auto Roll Pet Eggs", UDim2.new(0, 0, 0, 20), UDim2.new(1, 0, 0, 18), Config.AutoRollPets, function(val)
     Config.AutoRollPets = val
     if autoFishing then
-        if val then startAutoCollectTokensLoop() else cancelCollectTokensThread() end
+        startAutoCollectTokensLoop()
     end
 end)
 
@@ -1101,7 +1105,7 @@ createGridToggle(raidCard, "⚔️ Auto Join/Start Raids", UDim2.new(0, 0, 0, 20
             end
         end)
     end
-    if autoFishing or val then startAutoCollectTokensLoop() else cancelCollectTokensThread() end
+    startAutoCollectTokensLoop()
 end)
 
 -- Raid Mode Row
@@ -1361,7 +1365,7 @@ local voyageCard = createCard(automationTab, "AUTO VOYAGE AUTOMATION", UDim2.new
 
 createGridToggle(voyageCard, "⚓ Auto Voyages", UDim2.new(0, 0, 0, 20), UDim2.new(1, 0, 0, 18), Config.AutoVoyage, function(val)
     Config.AutoVoyage = val
-    if autoFishing or val then startAutoCollectTokensLoop() else cancelCollectTokensThread() end
+    startAutoCollectTokensLoop()
 end)
 
 -- Voyage Pack Row
@@ -1812,7 +1816,12 @@ function getBestRaidCards()
 end
 
 function startAutoCollectTokensLoop()
-    cancelCollectTokensThread()
+    local anyActive = Config.AutoCollectTokens or Config.AutoCollectDragonBalls or Config.AutoWish or Config.AutoRollPets or Config.AutoRaid or Config.AutoVoyage
+    if not anyActive then
+        cancelCollectTokensThread()
+        return
+    end
+    if collectTokensThread then return end
     collectTokensThread = task.spawn(function()
         while Config.AutoCollectTokens or Config.AutoCollectDragonBalls or Config.AutoWish or Config.AutoRollPets or Config.AutoRaid or Config.AutoVoyage do
             -- Collect Map Tokens & Potions
@@ -2589,7 +2598,7 @@ function startAutoFish()
         startAutoSellLoop()
     end
 
-    if Config.AutoCollectTokens or Config.AutoCollectDragonBalls or Config.AutoRollPets or Config.AutoRaid then
+    if Config.AutoCollectTokens or Config.AutoCollectDragonBalls or Config.AutoRollPets or Config.AutoRaid or Config.AutoVoyage or Config.AutoWish then
         startAutoCollectTokensLoop()
     end
 end
@@ -2600,7 +2609,9 @@ function stopAutoFish()
     stopClicking()
     cancelInstantThread()
     cancelAutoSellThread()
-    cancelCollectTokensThread()
+    if not (Config.AutoRaid or Config.AutoVoyage) then
+        cancelCollectTokensThread()
+    end
     lockUIHidden(false)
 
     pcall(function()
@@ -3201,7 +3212,7 @@ end)
 showTab("Fishing")
 updateModeUI()
 updateGradingUI()
-if Config.AutoCollectTokens or Config.AutoCollectDragonBalls or Config.AutoRollPets or Config.AutoRaid then
+if Config.AutoCollectTokens or Config.AutoCollectDragonBalls or Config.AutoRollPets or Config.AutoRaid or Config.AutoVoyage or Config.AutoWish then
     startAutoCollectTokensLoop()
 end
 if Config.AutoBuyPacks then
