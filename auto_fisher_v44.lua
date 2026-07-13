@@ -60,7 +60,8 @@ local PetConfig = require(ReplicatedStorage.Modules.Config.Core.PetConfig)
 local ReplicatedData = require(ReplicatedFirst:WaitForChild("ReplicatedData"))
 local FishHandler = require(ReplicatedStorage.Client.UI.FishHandler)
 local RaidHandler = require(ReplicatedStorage.Client.UI.RaidHandler)
-
+local lastPetQuestCheck = 0
+local lastPackOpenerCheck = 0
 -- =============================================
 -- CONFIG
 -- =============================================
@@ -88,6 +89,7 @@ Config = {
     
     -- Auto Sell Duplicate Fish
     AutoSellDupes = false,
+    ProtectIngredients = true, -- Protect cooking/crafting ingredients
 
     -- Auto Collect drops & card display wall cash
     AutoCollect = false,
@@ -104,6 +106,13 @@ Config = {
 
     -- Auto Roll Pet Eggs (Used to obtain Dragon Ball II)
     AutoRollPets = false,
+    AutoPetQuests = false,
+    
+    -- Auto Pack Opener settings
+    AutoPackOpener = false,
+    AutoPackTarget = "Ghoul",
+    AutoApplyHatchPotions = false,
+    
     PetEggType = "Basic",
     PetRollMethod = "Roll5",
 
@@ -185,20 +194,13 @@ local gradingThread = nil
 -- =============================================
 -- STUB DEFINITIONS FOR GUI INITIALIZATION
 -- =============================================
-local modeLabel, stratLabel, statusLabel, statsLabel, modeBtn, stratBtn, toggleBtn
-local inputContainer, thresholdContainer, inputLabel, thresholdLabel, delayInputBox, thresholdInputBox, debugLabel
-local buyPacksBtn, beltSpeedBtn, sidebar, mainPanel, divider, frame, titleBar, minimizedBtn, frameCorner
-local gradeStatusLabel, gradeToggleBtn, gradeMethodBtn, gradeTargetBtn, gradeModeBtn, gradingCard, nameRow, targetRow, methodRow
-local wishTypeBtn, petEggTypeBtn, petRollMethodBtn, raidModeBtn, raidSelectedPackBtn, cardSelectedFn, codesBtn, gradeCardInputBox, raidTimerLabel, voyageSelectedPackBtn
+-- Global UI elements to save local registers
+modeLabel, stratLabel, statusLabel, statsLabel, modeBtn, stratBtn, toggleBtn = nil, nil, nil, nil, nil, nil, nil
+inputContainer, thresholdContainer, inputLabel, thresholdLabel, delayInputBox, thresholdInputBox, debugLabel = nil, nil, nil, nil, nil, nil, nil
+buyPacksBtn, beltSpeedBtn, sidebar, mainPanel, divider, frame, titleBar, minimizedBtn, frameCorner = nil, nil, nil, nil, nil, nil, nil, nil, nil
+gradeStatusLabel, gradeToggleBtn, gradeMethodBtn, gradeTargetBtn, gradeModeBtn, gradingCard, nameRow, targetRow, methodRow = nil, nil, nil, nil, nil, nil, nil, nil, nil
+wishTypeBtn, petEggTypeBtn, petRollMethodBtn, raidModeBtn, raidSelectedPackBtn, cardSelectedFn, codesBtn, gradeCardInputBox, raidTimerLabel, voyageSelectedPackBtn = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil
 
--- Forward declarations of functions to resolve scoping/forward-reference issues
-local isPC, findMyPlot, shouldBuyPack, updateModeUI, setStatus, setDebug, updateStats, updateBeltSpeedSpoof
-local cancelCollectThread, startAutoCollectLoop, stopAutoCollectLoop, cancelCollectTokensThread, startAutoCollectTokensLoop
-local cancelAutoBuyPacksThread, startAutoBuyPacksLoop, cancelAutoRelicsThread, startAutoRelicsLoop, redeemAllCodes
-local getInventory, sellDuplicates, cancelAutoSellThread, startAutoSellLoop, simulateClick, startClicking, stopClicking
-local cancelInstantThread, doCast, recast, strategyTurbo, strategyHybrid
-local handleStartFishing, handleCatch, handleEscape, startAutoFish, stopAutoFish, bypassAFK, toggleMinimize, startDrag
-local enableGPU, disableGPU, lockUIHidden, startAutoGrading, stopAutoGrading, getGradeIndex, updateGradingUI, rollCard, getBestRaidCards
 
 _G.StopAutoFisher = function()
     autoFishing = false
@@ -224,6 +226,7 @@ _G.StopAutoFisher = function()
     if clickThread then pcall(task.cancel, clickThread) end
     if safetyThread then pcall(task.cancel, safetyThread) end
     if instantThread then pcall(task.cancel, instantThread) end
+    if _G.BiteConnection then pcall(function() _G.BiteConnection:Disconnect() end) _G.BiteConnection = nil end
     if autoSellThread then pcall(task.cancel, autoSellThread) end
     if collectThread then pcall(task.cancel, collectThread) end
     if collectTokensThread then pcall(task.cancel, collectTokensThread) end
@@ -440,7 +443,7 @@ automationTab.Position = UDim2.new(0, 10, 0, 10)
 automationTab.BackgroundTransparency = 1
 automationTab.BorderSizePixel = 0
 automationTab.ScrollBarThickness = 4
-automationTab.CanvasSize = UDim2.new(0, 0, 0, 820)
+automationTab.CanvasSize = UDim2.new(0, 0, 0, 920)
 automationTab.Parent = mainPanel
 tabFrames["Automation"] = automationTab
 
@@ -899,9 +902,9 @@ end)
 -- =============================================
 
 -- Card Container for Toggles (Height 175, fitting all toggles plus the Wish Type selector)
-local autoCard = createCard(automationTab, "AUTOMATION MODULES", UDim2.new(1, -10, 0, 175), UDim2.new(0, 0, 0, 0))
+local autoCard = createCard(automationTab, "AUTOMATION MODULES", UDim2.new(1, -10, 0, 193), UDim2.new(0, 0, 0, 0))
 
-local function createGridToggle(cardParent, labelText, position, size, initialValue, onToggle)
+function createGridToggle(cardParent, labelText, position, size, initialValue, onToggle)
     local row = Instance.new("Frame")
     row.Size = size
     row.Position = position
@@ -958,36 +961,40 @@ createGridToggle(autoCard, "💰 Sell Duplicate Fish", UDim2.new(0, 0, 0, 56), U
     end
 end)
 
-createGridToggle(autoCard, "🪙 Collect Map Tokens", UDim2.new(0, 0, 0, 74), UDim2.new(1, 0, 0, 18), Config.AutoCollectTokens, function(val)
+createGridToggle(autoCard, "🪙 Collect Map Tokens", UDim2.new(0, 0, 0, 92), UDim2.new(1, 0, 0, 18), Config.AutoCollectTokens, function(val)
     Config.AutoCollectTokens = val
     if autoFishing then
         startAutoCollectTokensLoop()
     end
 end)
 
-createGridToggle(autoCard, "🏺 Auto Craft Relics", UDim2.new(0, 0, 0, 92), UDim2.new(1, 0, 0, 18), Config.AutoRelics, function(val)
+createGridToggle(autoCard, "🏺 Auto Craft Relics", UDim2.new(0, 0, 0, 110), UDim2.new(1, 0, 0, 18), Config.AutoRelics, function(val)
     Config.AutoRelics = val
     if val then startAutoRelicsLoop() else cancelAutoRelicsThread() end
 end)
 
-createGridToggle(autoCard, "🐉 Collect Dragon Balls", UDim2.new(0, 0, 0, 110), UDim2.new(1, 0, 0, 18), Config.AutoCollectDragonBalls, function(val)
+createGridToggle(autoCard, "🐉 Collect Dragon Balls", UDim2.new(0, 0, 0, 128), UDim2.new(1, 0, 0, 18), Config.AutoCollectDragonBalls, function(val)
     Config.AutoCollectDragonBalls = val
     if autoFishing then
         startAutoCollectTokensLoop()
     end
 end)
 
-createGridToggle(autoCard, "🐉 Auto Wish (Shenron)", UDim2.new(0, 0, 0, 128), UDim2.new(1, 0, 0, 18), Config.AutoWish, function(val)
+createGridToggle(autoCard, "🐉 Auto Wish (Shenron)", UDim2.new(0, 0, 0, 146), UDim2.new(1, 0, 0, 18), Config.AutoWish, function(val)
     Config.AutoWish = val
     if autoFishing then
         startAutoCollectTokensLoop()
     end
 end)
 
+createGridToggle(autoCard, "🛡️ Protect Ingredients", UDim2.new(0, 0, 0, 74), UDim2.new(1, 0, 0, 18), Config.ProtectIngredients, function(val)
+    Config.ProtectIngredients = val
+end)
+
 -- Wish Type Selection Row
 local wishRow = Instance.new("Frame")
 wishRow.Size = UDim2.new(1, -16, 0, 20)
-wishRow.Position = UDim2.new(0, 0, 0, 148)
+wishRow.Position = UDim2.new(0, 0, 0, 166)
 wishRow.BackgroundTransparency = 1
 wishRow.Parent = autoCard
 
@@ -1015,9 +1022,9 @@ Instance.new("UICorner", wishTypeBtn).CornerRadius = UDim.new(0, 4)
 
 
 -- =============================================
--- PET EGG ROLLING CARD (Y = 180, Height 105)
+-- PETS & QUESTS AUTOMATION CARD (Y = 198, Height 123)
 -- =============================================
-local petEggCard = createCard(automationTab, "PET EGG ROLLING", UDim2.new(1, -10, 0, 105), UDim2.new(0, 0, 0, 180))
+local petEggCard = createCard(automationTab, "PETS & QUESTS AUTOMATION", UDim2.new(1, -10, 0, 123), UDim2.new(0, 0, 0, 198))
 
 createGridToggle(petEggCard, "🐾 Auto Roll Pet Eggs", UDim2.new(0, 0, 0, 20), UDim2.new(1, 0, 0, 18), Config.AutoRollPets, function(val)
     Config.AutoRollPets = val
@@ -1085,11 +1092,74 @@ petRollMethodBtn.Parent = methodRowPet
 Instance.new("UICorner", petRollMethodBtn).CornerRadius = UDim.new(0, 4)
 
 
+createGridToggle(petEggCard, "🐾 Auto Pet Quests", UDim2.new(0, 0, 0, 94), UDim2.new(1, 0, 0, 18), Config.AutoPetQuests, function(val)
+    Config.AutoPetQuests = val
+    if autoFishing then
+        startAutoCollectTokensLoop()
+    end
+end)
+
 -- =============================================
--- AUTO RAID CARD (Y = 290, Height 110)
+-- AUTO PACK OPENER CARD (Y = 326, Height 95)
+-- =============================================
+local packOpenerCard = createCard(automationTab, "AUTO PACK OPENER", UDim2.new(1, -10, 0, 95), UDim2.new(0, 0, 0, 326))
+
+createGridToggle(packOpenerCard, "📦 Auto Place/Open Packs", UDim2.new(0, 0, 0, 20), UDim2.new(1, 0, 0, 18), Config.AutoPackOpener, function(val)
+    Config.AutoPackOpener = val
+    if autoFishing then
+        startAutoCollectTokensLoop()
+    end
+end)
+
+-- Target Pack Name Row
+local packTargetRow = Instance.new("Frame")
+packTargetRow.Size = UDim2.new(1, -16, 0, 20)
+packTargetRow.Position = UDim2.new(0, 0, 0, 42)
+packTargetRow.BackgroundTransparency = 1
+packTargetRow.Parent = packOpenerCard
+
+local ptLabel = Instance.new("TextLabel")
+ptLabel.Size = UDim2.new(1, -105, 1, 0)
+ptLabel.Position = UDim2.new(0, 8, 0, 0)
+ptLabel.BackgroundTransparency = 1
+ptLabel.Text = "🎯 Target Pack:"
+ptLabel.TextColor3 = Color3.fromRGB(200, 200, 210)
+ptLabel.TextSize = 10
+ptLabel.TextXAlignment = Enum.TextXAlignment.Left
+ptLabel.Font = Enum.Font.Gotham
+ptLabel.Parent = packTargetRow
+
+local packTargetInputBox = Instance.new("TextBox")
+packTargetInputBox.Size = UDim2.new(0, 95, 0, 16)
+packTargetInputBox.Position = UDim2.new(1, -95, 0.5, -8)
+packTargetInputBox.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+packTargetInputBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+packTargetInputBox.Text = Config.AutoPackTarget
+packTargetInputBox.PlaceholderText = "e.g. Ghoul"
+packTargetInputBox.TextSize = 10
+packTargetInputBox.Font = Enum.Font.GothamBold
+packTargetInputBox.ClearTextOnFocus = false
+packTargetInputBox.Parent = packTargetRow
+Instance.new("UICorner", packTargetInputBox).CornerRadius = UDim.new(0, 4)
+
+packTargetInputBox.FocusLost:Connect(function(enterPressed)
+    if packTargetInputBox.Text ~= "" then
+        Config.AutoPackTarget = packTargetInputBox.Text
+        setDebug("Pack target set to: " .. Config.AutoPackTarget)
+    else
+        packTargetInputBox.Text = Config.AutoPackTarget
+    end
+end)
+
+createGridToggle(packOpenerCard, "🧪 Auto Apply Potions", UDim2.new(0, 0, 0, 68), UDim2.new(1, 0, 0, 18), Config.AutoApplyHatchPotions, function(val)
+    Config.AutoApplyHatchPotions = val
+end)
+
+-- =============================================
+-- AUTO RAID CARD (Y = 426, Height 130)
 -- =============================================
 do -- scope block to reduce top-level local register count
-local raidCard = createCard(automationTab, "AUTO RAID AUTOMATION", UDim2.new(1, -10, 0, 130), UDim2.new(0, 0, 0, 290))
+local raidCard = createCard(automationTab, "AUTO RAID AUTOMATION", UDim2.new(1, -10, 0, 130), UDim2.new(0, 0, 0, 426))
 
 
 createGridToggle(raidCard, "⚔️ Auto Join/Start Raids", UDim2.new(0, 0, 0, 20), UDim2.new(1, 0, 0, 18), Config.AutoRaid, function(val)
@@ -1196,11 +1266,11 @@ raidTimerLabel.Font = Enum.Font.GothamBold
 raidTimerLabel.Parent = rTimerRow
 end -- end raid card scope block
 
--- Promo Code Redeemer Button (Y = 425)
+-- Promo Code Redeemer Button (Y = 461)
 do -- scope block for promo code button
 codesBtn = Instance.new("TextButton")
 codesBtn.Size = UDim2.new(1, -10, 0, 24)
-codesBtn.Position = UDim2.new(0, 0, 0, 425)
+codesBtn.Position = UDim2.new(0, 0, 0, 561)
 codesBtn.Text = "🎁 Redeem All Promo Codes"
 codesBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 codesBtn.BackgroundColor3 = Color3.fromRGB(70, 30, 120)
@@ -1215,10 +1285,10 @@ codesBtnStroke.Color = Color3.fromRGB(100, 50, 180)
 end -- end promo code scope block
 
 -- =============================================
--- AUTO CARD GRADING CARD (Y = 455)
+-- AUTO CARD GRADING CARD (Y = 591)
 -- =============================================
 do -- scope block for grading card UI
-gradingCard = createCard(automationTab, "AUTO CARD GRADING", UDim2.new(1, -10, 0, 180), UDim2.new(0, 0, 0, 455))
+gradingCard = createCard(automationTab, "AUTO CARD GRADING", UDim2.new(1, -10, 0, 180), UDim2.new(0, 0, 0, 591))
 
 -- Grading Mode Row
 local modeRow = Instance.new("Frame")
@@ -1361,7 +1431,7 @@ end -- end grading card scope block
 -- AUTO VOYAGE CARD (Y = 660, Height 110)
 -- =============================================
 do -- scope block for Voyage UI
-local voyageCard = createCard(automationTab, "AUTO VOYAGE AUTOMATION", UDim2.new(1, -10, 0, 110), UDim2.new(0, 0, 0, 660))
+local voyageCard = createCard(automationTab, "AUTO VOYAGE AUTOMATION", UDim2.new(1, -10, 0, 110), UDim2.new(0, 0, 0, 796))
 
 createGridToggle(voyageCard, "⚓ Auto Voyages", UDim2.new(0, 0, 0, 20), UDim2.new(1, 0, 0, 18), Config.AutoVoyage, function(val)
     Config.AutoVoyage = val
@@ -1414,7 +1484,7 @@ end -- end voyage card scope block
 
 -- Track the dynamic content size to expand scroll height if items change
 automationTab:GetPropertyChangedSignal("AbsoluteWindowSize"):Connect(function()
-    automationTab.CanvasSize = UDim2.new(0, 0, 0, 820)
+    automationTab.CanvasSize = UDim2.new(0, 0, 0, 920)
 end)
 
 
@@ -1816,14 +1886,14 @@ function getBestRaidCards()
 end
 
 function startAutoCollectTokensLoop()
-    local anyActive = Config.AutoCollectTokens or Config.AutoCollectDragonBalls or Config.AutoWish or Config.AutoRollPets or Config.AutoRaid or Config.AutoVoyage
+    local anyActive = Config.AutoCollectTokens or Config.AutoCollectDragonBalls or Config.AutoWish or Config.AutoRollPets or Config.AutoRaid or Config.AutoVoyage or Config.AutoPetQuests or Config.AutoPackOpener
     if not anyActive then
         cancelCollectTokensThread()
         return
     end
     if collectTokensThread then return end
     collectTokensThread = task.spawn(function()
-        while Config.AutoCollectTokens or Config.AutoCollectDragonBalls or Config.AutoWish or Config.AutoRollPets or Config.AutoRaid or Config.AutoVoyage do
+        while Config.AutoCollectTokens or Config.AutoCollectDragonBalls or Config.AutoWish or Config.AutoRollPets or Config.AutoRaid or Config.AutoVoyage or Config.AutoPetQuests or Config.AutoPackOpener do
             -- Collect Map Tokens & Potions
             if Config.AutoCollectTokens then
                 local tag = player.Name .. "Token"
@@ -2070,6 +2140,154 @@ function startAutoCollectTokensLoop()
                         task.wait(2.0)
                     end
                 end)
+            end
+            
+            -- Auto Pet Quests Loop
+            if Config.AutoPetQuests then
+                local now = os.time()
+                if not lastPetQuestCheck or (now - lastPetQuestCheck) >= 15 then
+                    lastPetQuestCheck = now
+                    pcall(function()
+                        local petQuests = ReplicatedData.GetData("PetQuests") or {}
+                        
+                        for questId, questData in pairs(petQuests) do
+                            if questData.Completed ~= true then
+                                local questDef = PetConfig.Quests[questId]
+                                if questDef then
+                                    -- 1. Potion Crafting Quest
+                                    if questDef.Title == "Potion" or questDef.Title == "Potion II" then
+                                        local needed = questDef.Requirement - questData.Progress
+                                        if needed > 0 then
+                                            local packs = ReplicatedData.GetData("Packs") or {}
+                                            -- Check if we can craft HatchTime1 (Ninja x4, Soul x3, Pirate x5)
+                                            if (packs.Ninja or 0) >= 4 and (packs.Soul or 0) >= 3 and (packs.Pirate or 0) >= 5 then
+                                                setDebug("Auto-crafting HatchTime I for Pet Quest...")
+                                                ReplicatedStorage.Remotes.Potion:FireServer("Craft", "HatchTime1")
+                                                task.wait(0.5)
+                                            -- Or check if we can craft Luck1 (Pirate x5, Soul x3, Ninja x4)
+                                            elseif (packs.Pirate or 0) >= 5 and (packs.Soul or 0) >= 3 and (packs.Ninja or 0) >= 4 then
+                                                setDebug("Auto-crafting Luck I for Pet Quest...")
+                                                ReplicatedStorage.Remotes.Potion:FireServer("Craft", "Luck1")
+                                                task.wait(0.5)
+                                            end
+                                        end
+                                    
+                                    -- 2. Tower Quest
+                                    elseif questDef.Title == "Tower" or questDef.Title == "Tower II" then
+                                        local towerGui = PlayerGui:FindFirstChild("Tower")
+                                        local isTowerActive = towerGui and towerGui:FindFirstChild("Frame") and towerGui.Frame.Visible == true
+                                        if not isTowerActive then
+                                            setDebug("Starting Tower run for Pet Quest...")
+                                            ReplicatedStorage.Remotes.Tower:FireServer("StartTower")
+                                            task.wait(2.0)
+                                        end
+
+                                    -- 3. Place Packs Quest
+                                    elseif questDef.Title == "Place Packs" or questDef.Title == "Place Packs II" then
+                                        local packs = ReplicatedData.GetData("Packs") or {}
+                                        for packName, count in pairs(packs) do
+                                            if count > 0 and packName:find("-Bundle") == nil then
+                                                setDebug("Placing " .. packName .. " pack for Pet Quest...")
+                                                ReplicatedStorage.Remotes.Card:FireServer("Place", packName)
+                                                task.wait(0.2)
+                                                break
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end)
+                end
+            end
+            
+            -- Auto Pack Opener Loop
+            if Config.AutoPackOpener then
+                local now = os.time()
+                if not lastPackOpenerCheck or (now - lastPackOpenerCheck) >= 8 then
+                    lastPackOpenerCheck = now
+                    pcall(function()
+                        local packsPlaced = ReplicatedData.GetData("PacksPlaced") or {}
+                        local maxPlacements = ReplicatedData.GetData("MaxPlacements") or 9
+                        local placedCount = 0
+                        local hasHatchingPacks = false
+                        
+                        for _, pData in pairs(packsPlaced) do
+                            placedCount = placedCount + 1
+                            local serverTime = workspace:GetServerTimeNow()
+                            if serverTime - pData.Time < pData.HatchTime then
+                                hasHatchingPacks = true
+                            end
+                        end
+                        
+                        -- 1. Auto Place Packs if space remains
+                        if placedCount < maxPlacements then
+                            local ownedPacks = ReplicatedData.GetData("Packs") or {}
+                            local target = Config.AutoPackTarget
+                            if (ownedPacks[target] or 0) > 0 then
+                                setDebug("Auto-placing target pack: " .. target)
+                                ReplicatedStorage.Remotes.Card:FireServer("Hotbar", "1", target)
+                                task.wait(0.2)
+                                ReplicatedStorage.Remotes.Card:FireServer("Equip", target)
+                                task.wait(0.2)
+                                ReplicatedStorage.Remotes.Card:FireServer("Place", target)
+                                task.wait(0.2)
+                                ReplicatedStorage.Remotes.Card:FireServer("Unequip", target)
+                                task.wait(0.5)
+                            end
+                        end
+                        
+                        -- 2. Auto Apply Potions if enabled
+                        if Config.AutoApplyHatchPotions and hasHatchingPacks then
+                            local consumables = ReplicatedData.GetData("Consumables") or {}
+                            local targetPotion = nil
+                            if (consumables.HatchTime3 or 0) > 0 then
+                                targetPotion = "HatchTime3"
+                            elseif (consumables.HatchTime2 or 0) > 0 then
+                                targetPotion = "HatchTime2"
+                            elseif (consumables.HatchTime1 or 0) > 0 then
+                                targetPotion = "HatchTime1"
+                            end
+                            
+                            if targetPotion then
+                                setDebug("Auto-applying Hatch Potion: " .. targetPotion)
+                                ReplicatedStorage.Remotes.Potion:FireServer("Apply", targetPotion)
+                                task.wait(0.5)
+                            end
+                        end
+                        
+                        -- 3. Teleport & Trigger ProximityPrompt for Ready Packs
+                        local plotName = player:GetAttribute("Plot")
+                        local plot = workspace.Plots:FindFirstChild(plotName or "")
+                        local char = player.Character
+                        local root = char and char:FindFirstChild("HumanoidRootPart")
+                        
+                        if plot and plot:FindFirstChild("Packs") and root then
+                            for _, pack in ipairs(plot.Packs:GetChildren()) do
+                                for _, prompt in ipairs(pack:GetDescendants()) do
+                                    if prompt:IsA("ProximityPrompt") and prompt.Enabled and prompt.ActionText == "Open Pack" then
+                                        setDebug("Teleporting to open pack: " .. pack.Name)
+                                        local oldCFrame = root.CFrame
+                                        root.CFrame = pack:GetPivot()
+                                        task.wait(0.25)
+                                        pcall(function()
+                                            prompt.HoldDuration = 0
+                                            prompt.RequiresLineOfSight = false
+                                            if fireproximityprompt then
+                                                fireproximityprompt(prompt)
+                                            else
+                                                prompt:InputBegan(player)
+                                            end
+                                        end)
+                                        task.wait(0.25)
+                                        root.CFrame = oldCFrame
+                                        task.wait(0.3)
+                                    end
+                                end
+                            end
+                        end
+                    end)
+                end
             end
             
             task.wait(1.0)
@@ -2328,7 +2546,34 @@ function getInventory()
     return fishList
 end
 
+local function getRequiredIngredients()
+    local req = {}
+    pcall(function()
+        local FishConfig = require(ReplicatedStorage.Modules.Config.Core.FishConfig)
+        if FishConfig.Recipes then
+            for _, r in pairs(FishConfig.Recipes) do
+                if r.Ingredients then
+                    for fName, amt in pairs(r.Ingredients) do
+                        req[fName] = math.max(req[fName] or 0, amt)
+                    end
+                end
+            end
+        end
+        if FishConfig.Rods then
+            for _, r in pairs(FishConfig.Rods) do
+                if r.Requirements then
+                    for fName, amt in pairs(r.Requirements) do
+                        req[fName] = math.max(req[fName] or 0, amt)
+                    end
+                end
+            end
+        end
+    end)
+    return req
+end
+
 function sellDuplicates()
+    local req = Config.ProtectIngredients and getRequiredIngredients() or {}
     local fishList = getInventory()
     if #fishList == 0 then
         return 0
@@ -2338,16 +2583,18 @@ function sellDuplicates()
     for _, fishData in ipairs(fishList) do
         if not Config.AutoSellDupes or not autoFishing then break end
 
-        local sellCount = fishData.amount - 1
-        setDebug("Auto-Selling " .. fishData.name .. " x" .. sellCount)
-
-        for i = 1, sellCount do
-            if not Config.AutoSellDupes or not autoFishing then break end
-            pcall(Fish.FireServer, Fish, "Sell", fishData.name)
-            totalSoldThisRound = totalSoldThisRound + 1
-            task.wait(0.15)
+        local targetKeep = req[fishData.name] or 1
+        local sellCount = fishData.amount - targetKeep
+        if sellCount > 0 then
+            setDebug("Auto-Selling " .. fishData.name .. " x" .. sellCount)
+            for i = 1, sellCount do
+                if not Config.AutoSellDupes or not autoFishing then break end
+                pcall(Fish.FireServer, Fish, "Sell", fishData.name)
+                totalSoldThisRound = totalSoldThisRound + 1
+                task.wait(0.15)
+            end
+            task.wait(0.3)
         end
-        task.wait(0.3)
     end
 
     return totalSoldThisRound
@@ -2483,10 +2730,21 @@ end
 function handleStartFishing(fishName)
     if Config.Mode == "Blatant" then
         local strat = Config.BlatantStrategy
-        if strat == "instant" then
-            task.spawn(function()
-                setStatus("🚀 INSTANT: Catching...", Color3.fromRGB(0, 220, 150))
-                setDebug("Waiting catch delay...")
+        if strat == "instant" or strat == "blatant" then
+            if _G.BiteConnection then pcall(function() _G.BiteConnection:Disconnect() end) end
+            setStatus(strat == "instant" and "🚀 INS: Waiting bite..." or "🔥 BLT: Waiting bite...", Color3.fromRGB(0, 220, 150))
+            setDebug("Waiting for bite sound...")
+            local FishAlert = ReplicatedStorage:WaitForChild("Assets"):WaitForChild("Sounds"):WaitForChild("Fish"):WaitForChild("FishAlert")
+            _G.BiteConnection = FishAlert.Played:Connect(function()
+                if not autoFishing or (Config.BlatantStrategy ~= "instant" and Config.BlatantStrategy ~= "blatant") then
+                    if _G.BiteConnection then _G.BiteConnection:Disconnect(); _G.BiteConnection = nil end
+                    return
+                end
+                _G.BiteConnection:Disconnect()
+                _G.BiteConnection = nil
+                
+                setStatus(strat == "instant" and "🚀 INS: Catching..." or "🔥 BLT: Catching...", Color3.fromRGB(0, 255, 150))
+                setDebug("Bite detected! Waiting catch delay...")
                 task.wait(Config.InstantCatchDelay)
                 if not autoFishing then return end
                 setDebug("Firing FishCaught remote...")
@@ -2496,14 +2754,6 @@ function handleStartFishing(fishName)
             strategyTurbo(fishName)
         elseif strat == "hybrid" then
             strategyHybrid(fishName)
-        elseif strat == "blatant" then
-            task.spawn(function()
-                task.wait(Config.InstantCatchDelay)
-                if not autoFishing then return end
-                setStatus("🔥 BLT: Catching...", Color3.fromRGB(0, 180, 255))
-                setDebug("Firing FishCaught remote...")
-                pcall(Fish.FireServer, Fish, "FishCaught")
-            end)
         end
     else
         setStatus("Clicking! " .. tostring(fishName), Color3.fromRGB(0, 255, 120))
@@ -2616,6 +2866,10 @@ function stopAutoFish()
     waitingForCatch = false
     stopClicking()
     cancelInstantThread()
+    if _G.BiteConnection then
+        pcall(function() _G.BiteConnection:Disconnect() end)
+        _G.BiteConnection = nil
+    end
     cancelAutoSellThread()
     if not (Config.AutoRaid or Config.AutoVoyage) then
         cancelCollectTokensThread()
@@ -3236,7 +3490,7 @@ end)
 showTab("Fishing")
 updateModeUI()
 updateGradingUI()
-if Config.AutoCollectTokens or Config.AutoCollectDragonBalls or Config.AutoRollPets or Config.AutoRaid or Config.AutoVoyage or Config.AutoWish then
+if Config.AutoCollectTokens or Config.AutoCollectDragonBalls or Config.AutoRollPets or Config.AutoRaid or Config.AutoVoyage or Config.AutoWish or Config.AutoPetQuests or Config.AutoPackOpener then
     startAutoCollectTokensLoop()
 end
 if Config.AutoBuyPacks then
