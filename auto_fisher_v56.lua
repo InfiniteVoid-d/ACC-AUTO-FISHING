@@ -2971,8 +2971,9 @@ local function getRequiredIngredients()
         local FishConfig = require(ReplicatedStorage.Modules.Config.Core.FishConfig)
         if FishConfig.Recipes then
             for _, r in pairs(FishConfig.Recipes) do
-                if r.Ingredients then
-                    for fName, amt in pairs(r.Ingredients) do
+                local items = r.Ingredients or r.Requirements
+                if items then
+                    for fName, amt in pairs(items) do
                         req[fName] = math.max(req[fName] or 0, amt)
                     end
                 end
@@ -2980,8 +2981,9 @@ local function getRequiredIngredients()
         end
         if FishConfig.Rods then
             for _, r in pairs(FishConfig.Rods) do
-                if r.Requirements then
-                    for fName, amt in pairs(r.Requirements) do
+                local items = r.Ingredients or r.Requirements
+                if items then
+                    for fName, amt in pairs(items) do
                         req[fName] = math.max(req[fName] or 0, amt)
                     end
                 end
