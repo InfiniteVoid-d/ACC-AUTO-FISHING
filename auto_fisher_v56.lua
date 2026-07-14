@@ -2148,31 +2148,51 @@ end
 -- Get remaining active duration of a cooking buff in seconds
 local function getRecipeRemainingTime(recipeName)
     local remaining = 0
+    
+    -- 1. Query the HUD Boosts UI frame directly
     pcall(function()
-        -- 1. Try reading from replicated replica data cache
-        local buffs = ReplicatedData.GetData("Buffs") or ReplicatedData.GetData("CookBuffs") or ReplicatedData.GetData("Cooking") or ReplicatedData.GetData("ActiveBuffs")
-        if buffs and buffs[recipeName] then
-            local val = buffs[recipeName]
-            if type(val) == "number" then
-                if val > 1700000000 then
-                    remaining = math.max(0, val - os.time())
-                else
-                    remaining = val
-                end
-            elseif type(val) == "table" then
-                local endTime = val.EndTime or val.Expire or val.Time or val.Duration
-                if endTime then
-                    if endTime > 1700000000 then
-                        remaining = math.max(0, endTime - os.time())
-                    else
-                        remaining = endTime
-                    end
+        local HUD = PlayerGui:FindFirstChild("HUD")
+        local boosts = HUD and HUD:FindFirstChild("Frame") and HUD.Frame:FindFirstChild("Boosts")
+        local f = boosts and boosts:FindFirstChild(recipeName)
+        if f and f.Visible then
+            local timer = f:FindFirstChild("Timer")
+            if timer then
+                local text = timer.Text or ""
+                local min, sec = text:match("(%d+):(%d+)")
+                if min and sec then
+                    remaining = tonumber(min) * 60 + tonumber(sec)
                 end
             end
         end
     end)
     
-    -- 2. Fallback: Parse timers from player UI descendants
+    -- 2. Fallback: Query replicated replica data cache
+    if remaining <= 0 then
+        pcall(function()
+            local buffs = ReplicatedData.GetData("Buffs") or ReplicatedData.GetData("CookBuffs") or ReplicatedData.GetData("Cooking") or ReplicatedData.GetData("ActiveBuffs")
+            if buffs and buffs[recipeName] then
+                local val = buffs[recipeName]
+                if type(val) == "number" then
+                    if val > 1700000000 then
+                        remaining = math.max(0, val - os.time())
+                    else
+                        remaining = val
+                    end
+                elseif type(val) == "table" then
+                    local endTime = val.EndTime or val.Expire or val.Time or val.Duration
+                    if endTime then
+                        if endTime > 1700000000 then
+                            remaining = math.max(0, endTime - os.time())
+                        else
+                            remaining = endTime
+                        end
+                    end
+                end
+            end
+        end)
+    end
+    
+    -- 3. Fallback: Parse timers from player UI descendants
     if remaining <= 0 then
         pcall(function()
             local mainGui = PlayerGui:FindFirstChild("Main") or PlayerGui:FindFirstChild("UI") or PlayerGui:FindFirstChild("MainGui")
