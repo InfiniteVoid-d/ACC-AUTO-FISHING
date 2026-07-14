@@ -1,10 +1,9 @@
 -- =============================================
--- CLEANUP OLD RUNNING THREADS / GLOBAL STATE
+-- Auto Fisher v27 - Event-Driven Blatant
+-- For: Anime Card Collection (Fish It!)
+-- Author: LO + ENI
+-- Integrated with v36 Auto Collect Money Engine
 -- =============================================
-if _G.StopAutoFisher then
-    pcall(_G.StopAutoFisher)
-    _G.StopAutoFisher = nil
-end
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -24,7 +23,7 @@ local Config = {
     Mode = "Blatant",
 
     -- Blatant strategy: "instant" | "turbo" | "hybrid" | "blatant"
-    BlatantStrategy = "blatant", -- Default to blatant to prevent SEH crashes on mobile executors
+    BlatantStrategy = "instant",
 
     -- Legit
     LegitClickDelay = 0.05,
@@ -45,7 +44,7 @@ local Config = {
     -- Auto Sell Duplicate Fish
     AutoSellDupes = false,
 
-    -- Auto Collect drops & card display wall cash
+    -- Auto Collect drops & card display wall cash (v36)
     AutoCollect = false,
 
     -- GPU Saver
@@ -73,26 +72,12 @@ local fishSold = 0
 local sessionStart = 0
 local waitingForCatch = false
 local UICollapsed = false
-local originalHeight = 250
+local originalHeight = 260      
 
 local gpuActive = false
 local whiteScreen = nil
 
 local FishUI = PlayerGui:FindFirstChild("FishUI")
-
-_G.StopAutoFisher = function()
-    autoFishing = false
-    clicking = false
-    if connection then pcall(function() connection:Disconnect() end) end
-    if clickThread then pcall(task.cancel, clickThread) end
-    if safetyThread then pcall(task.cancel, safetyThread) end
-    if instantThread then pcall(task.cancel, instantThread) end
-    if autoSellThread then pcall(task.cancel, autoSellThread) end
-    if collectThread then pcall(task.cancel, collectThread) end
-    if uiConnection then pcall(function() uiConnection:Disconnect() end) end
-    lockUIHidden(false)
-    pcall(disableGPU)
-end
 
 -- =============================================
 -- CLEANUP OLD UI
@@ -107,15 +92,15 @@ end
 -- UI CREATION
 -- =============================================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "AutoFishUI_v36"
+screenGui.Name = "AutoFishUI_v27"
 screenGui.ResetOnSpawn = false
 screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-screenGui.DisplayOrder = 1000000 -- Stay on top of GPU Saver screen
+screenGui.DisplayOrder = 1000000 
 screenGui.Parent = PlayerGui
 
 local frame = Instance.new("Frame")
 frame.Size = UDim2.new(0, 210, 0, originalHeight)
-frame.Position = UDim2.new(0, 20, 0.5, -125)
+frame.Position = UDim2.new(0, 20, 0.5, -130)
 frame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
 frame.BorderSizePixel = 0
 frame.Active = true
@@ -131,7 +116,7 @@ local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 26)
 title.Position = UDim2.new(0, 0, 0, 0)
 title.BorderSizePixel = 0
-title.Text = " 🎣 Auto Fisher v36"
+title.Text = " 🎣 Auto Fisher v27"
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
 title.TextScaled = true
 title.TextXAlignment = Enum.TextXAlignment.Left
@@ -220,7 +205,7 @@ toggleBtn.Font = Enum.Font.GothamBold
 toggleBtn.Parent = frame
 Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 6)
 
--- Toggles Row (GPU Saver & Auto Collect)
+-- Toggles Row (GPU Saver & Auto Sell duplicates)
 local gpuBtn = Instance.new("TextButton")
 gpuBtn.Size = UDim2.new(0.5, -15, 0, 20)
 gpuBtn.Position = UDim2.new(0, 10, 0, 118)
@@ -231,26 +216,26 @@ gpuBtn.Font = Enum.Font.Gotham
 gpuBtn.Parent = frame
 Instance.new("UICorner", gpuBtn).CornerRadius = UDim.new(0, 6)
 
-local collectBtn = Instance.new("TextButton")
-collectBtn.Size = UDim2.new(0.5, -15, 0, 20)
-collectBtn.Position = UDim2.new(0.5, 5, 0, 118)
-collectBtn.BorderSizePixel = 0
-collectBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-collectBtn.TextScaled = true
-collectBtn.Font = Enum.Font.Gotham
-collectBtn.Parent = frame
-Instance.new("UICorner", collectBtn).CornerRadius = UDim.new(0, 6)
-
--- Row 8: Auto Sell duplicates (full width)
 local autoSellBtn = Instance.new("TextButton")
-autoSellBtn.Size = UDim2.new(1, -20, 0, 20)
-autoSellBtn.Position = UDim2.new(0, 10, 0, 143)
+autoSellBtn.Size = UDim2.new(0.5, -15, 0, 20)
+autoSellBtn.Position = UDim2.new(0.5, 5, 0, 118)
 autoSellBtn.BorderSizePixel = 0
 autoSellBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 autoSellBtn.TextScaled = true
 autoSellBtn.Font = Enum.Font.Gotham
 autoSellBtn.Parent = frame
 Instance.new("UICorner", autoSellBtn).CornerRadius = UDim.new(0, 6)
+
+-- Reinstated v36 Row 8: Auto Collect (full width)
+local collectBtn = Instance.new("TextButton")
+collectBtn.Size = UDim2.new(1, -20, 0, 20)
+collectBtn.Position = UDim2.new(0, 10, 0, 143)
+collectBtn.BorderSizePixel = 0
+collectBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+collectBtn.TextScaled = true
+collectBtn.Font = Enum.Font.Gotham
+collectBtn.Parent = frame
+Instance.new("UICorner", collectBtn).CornerRadius = UDim.new(0, 6)
 
 -- =============================================
 -- INPUT BOX 1: CATCH DELAY
@@ -329,12 +314,35 @@ debugLabel.Font = Enum.Font.Gotham
 debugLabel.Parent = frame
 
 -- =============================================
+-- SYSTEM DEGRADATIONS
+-- =============================================
+local function setStatus(text, color)
+    if statusLabel then
+        statusLabel.Text = "Status: " .. text
+        statusLabel.TextColor3 = color or Color3.fromRGB(180, 180, 180)
+    end
+end
+
+local function setDebug(text)
+    if debugLabel then
+        debugLabel.Text = text
+    end
+end
+
+local function updateStats()
+    if statsLabel then
+        local elapsed = math.floor((tick() - sessionStart) / 60)
+        statsLabel.Text = string.format("Caught: %d | Sold: %d | Time: %dm", fishCaught, fishSold, elapsed)
+    end
+end
+
+-- =============================================
 -- UI HELPERS & UPDATER
 -- =============================================
 local strategies = {"instant", "turbo", "hybrid", "blatant"}
 local childrenToToggle = {
     modeLabel, stratLabel, statusLabel, statsLabel,
-    modeBtn, stratBtn, toggleBtn, gpuBtn, collectBtn, autoSellBtn,
+    modeBtn, stratBtn, toggleBtn, gpuBtn, autoSellBtn, collectBtn,
     inputContainer, thresholdContainer, debugLabel
 }
 
@@ -351,8 +359,8 @@ local function updateModeUI()
     stratBtn.Visible = isBlatant
     stratLabel.Visible = isBlatant
     gpuBtn.Visible = true
-    collectBtn.Visible = true
     autoSellBtn.Visible = true
+    collectBtn.Visible = true
     
     local showDelay = isBlatant and (Config.BlatantStrategy == "instant" or Config.BlatantStrategy == "hybrid" or Config.BlatantStrategy == "blatant")
     local showThreshold = isBlatant and (Config.BlatantStrategy == "instant" or Config.BlatantStrategy == "blatant")
@@ -391,25 +399,11 @@ local function updateModeUI()
     gpuBtn.Text = Config.GPUSaver and "🖥️ GPU: ON" or "🖥️ GPU: OFF"
     gpuBtn.BackgroundColor3 = Config.GPUSaver and Color3.fromRGB(180, 100, 0) or Color3.fromRGB(50, 50, 55)
 
-    collectBtn.Text = Config.AutoCollect and "🪙 Collect: ON" or "🪙 Collect: OFF"
-    collectBtn.BackgroundColor3 = Config.AutoCollect and Color3.fromRGB(180, 100, 0) or Color3.fromRGB(50, 50, 55)
-
     autoSellBtn.Text = Config.AutoSellDupes and "💰 SellDupes: ON" or "💰 SellDupes: OFF"
     autoSellBtn.BackgroundColor3 = Config.AutoSellDupes and Color3.fromRGB(180, 100, 0) or Color3.fromRGB(50, 50, 55)
-end
 
-local function setStatus(text, color)
-    statusLabel.Text = "Status: " .. text
-    statusLabel.TextColor3 = color or Color3.fromRGB(180, 180, 180)
-end
-
-local function setDebug(text)
-    debugLabel.Text = text
-end
-
-local function updateStats()
-    local elapsed = math.floor((tick() - sessionStart) / 60)
-    statsLabel.Text = string.format("Caught: %d | Sold: %d | Time: %dm", fishCaught, fishSold, elapsed)
+    collectBtn.Text = Config.AutoCollect and "🪙 Collect: ON" or "🪙 Collect: OFF"
+    collectBtn.BackgroundColor3 = Config.AutoCollect and Color3.fromRGB(180, 100, 0) or Color3.fromRGB(50, 50, 55)
 end
 
 -- =============================================
@@ -535,9 +529,6 @@ local function enableGPU()
     setDebug("GPU Saver enabled")
 end
 
--- =============================================
--- AUTO COLLECT MONEY ENGINE (FLOOR & CARD BINDER)
--- =============================================
 local function disableGPU()
     if not gpuActive then return end
     gpuActive = false
@@ -554,27 +545,20 @@ local function disableGPU()
     setDebug("GPU Saver disabled")
 end
 
-local function cancelCollectThread()
-    if collectThread then
-        pcall(task.cancel, collectThread)
-        collectThread = nil
-    end
-end
-
+-- =============================================
+-- BACKPORTED FEATURE: v36 AUTO COLLECT ENGINE
+-- =============================================
 local function findMyPlot()
     local plotsFolder = workspace:FindFirstChild("Plots")
     if not plotsFolder then return nil end
     for _, p in ipairs(plotsFolder:GetChildren()) do
-        -- Check the Timer descendant first (accurate & fast)
         local timer = p:FindFirstChild("Timer", true)
         if timer and timer:GetAttribute("Owner") == player.Name then
             return p
         end
-        -- Fallback 1: check Owner/Player attributes directly on the plot
         if p:GetAttribute("Owner") == player.Name or p:GetAttribute("Player") == player.Name then
             return p
         end
-        -- Fallback 2: check string values or attributes named Owner
         for _, descendant in ipairs(p:GetDescendants()) do
             if descendant.Name == "Owner" then
                 local isMatch = false
@@ -595,10 +579,17 @@ local function findMyPlot()
     return nil
 end
 
+local function cancelCollectThread()
+    if collectThread then
+        pcall(task.cancel, collectThread)
+        collectThread = nil
+    end
+end
+
 local function startAutoCollectLoop()
     cancelCollectThread()
     local lastCardCollect = 0
-    local maxPages = 30 -- Support all 30 card display pages
+    local maxPages = 30
     
     collectThread = task.spawn(function()
         while Config.AutoCollect do
@@ -634,7 +625,6 @@ local function startAutoCollectLoop()
                 pcall(function() CardRemote = ReplicatedStorage.Remotes:FindFirstChild("Card") end)
                 
                 if CardRemote then
-                    -- Sweep Pages 1 to maxPages
                     for page = 1, maxPages do
                         if not Config.AutoCollect then break end
                         
@@ -650,7 +640,6 @@ local function startAutoCollectLoop()
                                 local rightCount = right and #right:GetChildren() or 0
                                 setDebug(string.format("Page %d/%d (Plot: %s, Slots: %d)", page, maxPages, tostring(myPlot.Name), leftCount + rightCount))
                                 
-                                -- Instant sweep: Fire all remotes on the current page simultaneously (no type checks to prevent skipping card models)
                                 if left then
                                     for _, slot in ipairs(left:GetChildren()) do
                                         pcall(function() CardRemote:FireServer("Collect", slot) end)
@@ -668,31 +657,31 @@ local function startAutoCollectLoop()
                             setDebug(string.format("Page %d/%d (Plot not found!)", page, maxPages))
                         end
                         
-                        task.wait(1.0) -- Safe yield outside pcall
+                        task.wait(1.0)
                         
-                        -- Turn page if we haven't reached the end yet
                         if page < maxPages then
                             if not Config.AutoCollect then break end
                             pcall(function() CardRemote:FireServer("Page", "RightArrow") end)
-                            task.wait(1.0) -- Safe yield outside pcall
+                            task.wait(1.0)
                         end
                     end
                     
-                    -- Reset binder back to Page 1 instantly on the server to prevent desync
                     if Config.AutoCollect then
                         setDebug("Resetting binder to Page 1...")
                         for i = 1, maxPages - 1 do
                             pcall(function() CardRemote:FireServer("Page", "LeftArrow") end)
                         end
-                        task.wait(1.0) -- Safe yield outside pcall
+                        task.wait(1.0)
                     end
                     setDebug("Card display sweep complete")
                 end
-                lastCardCollect = tick() -- Reset timer only AFTER the full sweep completes!
+                lastCardCollect = tick()
             end
-            task.wait(1.5) -- Floor loop throttle
+            task.wait(1.5)
         end
     end)
+end
+
 -- =============================================
 -- DUPLICATES SELLING ENGINE
 -- =============================================
@@ -743,6 +732,31 @@ local function sellDuplicates()
     return totalSoldThisRound
 end
 
+local function cancelAutoSellThread()
+    if autoSellThread then
+        pcall(task.cancel, autoSellThread)
+        autoSellThread = nil
+    end
+end
+
+local function startAutoSellLoop()
+    cancelAutoSellThread()
+    autoSellThread = task.spawn(function()
+        while Config.AutoSellDupes and autoFishing do
+            task.wait(1.5)
+            if not Config.AutoSellDupes or not autoFishing then break end
+            
+            local sold = sellDuplicates()
+            if sold > 0 then
+                fishSold = fishSold + sold
+                updateStats()
+            end
+            
+            task.wait(5.0)
+        end
+    end)
+end
+
 -- =============================================
 -- CLICK ENGINE (For Legit/Turbo/Hybrid)
 -- =============================================
@@ -770,7 +784,6 @@ local function stopClicking()
         pcall(task.cancel, clickThread)
         clickThread = nil
     end
-    -- Guarantee mouse button release to prevent holding states
     pcall(function()
         local VirtualInputManager = game:GetService("VirtualInputManager")
         VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
@@ -803,48 +816,26 @@ local function recast()
 end
 
 -- =============================================
--- FIND FISH RES LOOP (Optimized getgc + getconnections)
+-- FIND FISH RES LOOP
 -- =============================================
-local cachedFishHandler = nil
 local function findFishHandlerLoop()
-    if cachedFishHandler then
-        return cachedFishHandler
-    end
-    
-    -- Use pure getgc search (highly stable, memory-safe, avoids SEH crashes entirely)
-    local gcOk, gc = pcall(getgc)
-    if gcOk and type(gc) == "table" then
-        for _, v in pairs(gc) do
-            if type(v) == "function" then
-                local ok, info = pcall(getinfo, v)
-                if ok and info then
-                    local src = tostring(info.source or ""):lower()
-                    local shortSrc = tostring(info.short_src or ""):lower()
-                    if src:find("fishhandler") or shortSrc:find("fishhandler") then
-                        cachedFishHandler = v
-                        return v
-                    end
-                end
+    local conns = getconnections(RunService.RenderStepped)
+    for _, conn in pairs(conns) do
+        local fn = conn.Function
+        if fn then
+            local info = getinfo(fn)
+            if info and info.source and info.source:find("FishHandler") then
+                return fn
             end
         end
     end
-    
     return nil
 end
 
 -- =============================================
 -- STRATEGIES
 -- =============================================
-
 local function startInstantLoop()
-    local isMobile = UserInputService.TouchEnabled
-    if isMobile then
-        setDebug("Instant strategy disabled on mobile to prevent crashes.")
-        Config.BlatantStrategy = "blatant"
-        updateModeUI()
-        return
-    end
-    
     cancelInstantThread()
     instantThread = task.spawn(function()
         while autoFishing do
@@ -852,29 +843,23 @@ local function startInstantLoop()
             if fn then
                 local ok, ups = pcall(getupvalues, fn)
                 if ok and ups then
-                    local isMinigameActive = ups[1] -- v7
+                    local isMinigameActive = ups[1]
                     if isMinigameActive == true then
-                        local goalScore = ups[8] -- v18
+                        local goalScore = ups[8]
                         if goalScore then
                             setStatus("🚀 INSTANT: Struggle...", Color3.fromRGB(0, 220, 150))
                             setDebug("Freezing progress at " .. (Config.SlowReelThreshold * 100) .. "%...")
                             
-                            -- Disable the minigame drain completely
-                            pcall(debug.setupvalue, fn, 15, 0) -- v19 (drain rate) to 0
-                            pcall(debug.setupvalue, fn, 14, 0) -- v26 (hold drain) to 0
+                            pcall(debug.setupvalue, fn, 15, 0)
+                            pcall(debug.setupvalue, fn, 14, 0)
+                            pcall(debug.setupvalue, fn, 6, goalScore * Config.SlowReelThreshold)
                             
-                            -- Instantly set the progress bar to struggle percentage
-                            pcall(debug.setupvalue, fn, 6, goalScore * Config.SlowReelThreshold) -- v17 (current score)
-                            
-                            -- Wait the dynamic user-configured delay
                             task.wait(Config.InstantCatchDelay)
                             if not autoFishing then break end
                             
-                            -- Complete the catch
                             setDebug("Completing catch...")
-                            pcall(debug.setupvalue, fn, 6, goalScore) -- Set progress to 100%
+                            pcall(debug.setupvalue, fn, 6, goalScore)
                             
-                            -- Wait until game ends to start checking again
                             repeat 
                                 task.wait(0.1) 
                                 local currentUps = getupvalues(fn)
@@ -927,7 +912,6 @@ local function handleStartFishing(fishName)
         elseif strat == "hybrid" then
             strategyHybrid(fishName)
         elseif strat == "blatant" then
-            -- Blatant: Direct network catch immediately when fish bites!
             task.spawn(function()
                 task.wait(Config.InstantCatchDelay)
                 if not autoFishing then return end
@@ -956,14 +940,14 @@ local function handleCatch(eventType, fishName)
     recast()
 end
 
-local function handleEscape(reason)
+local function handleEscape()
     stopClicking()
     if Config.BlatantStrategy ~= "instant" then
         cancelInstantThread()
     end
     waitingForCatch = false
     setStatus("Escaped! Recasting...", Color3.fromRGB(255, 100, 0))
-    setDebug("Fish escaped: " .. tostring(reason or ""))
+    setDebug("Fish escaped")
     task.wait(Config.EscapeRecastDelay)
     if autoFishing then doCast() end
 end
@@ -983,7 +967,6 @@ local function startAutoFish()
         end
     end)
 
-    -- Lock UI visibility in Blatant mode (fully suppresses minigame bars for instant/blatant strategy)
     if Config.Mode == "Blatant" then
         lockUIHidden(true)
     end
@@ -998,7 +981,7 @@ local function startAutoFish()
             updateStats()
             handleCatch(eventType, fishName)
         elseif eventType == "FishEscaped" then
-            handleEscape(fishName)
+            handleEscape()
         elseif eventType == "EquipRod" or eventType == "OpenTreasure" then
             setDebug("Event: " .. tostring(eventType))
         elseif eventType == "Sold" then
@@ -1008,7 +991,6 @@ local function startAutoFish()
         end
     end)
 
-    -- Start background loop for the instant strategy
     if Config.BlatantStrategy == "instant" then
         startInstantLoop()
     end
@@ -1029,9 +1011,13 @@ local function startAutoFish()
         end
     end)
 
-    -- Start auto sell loop if enabled
     if Config.AutoSellDupes then
         startAutoSellLoop()
+    end
+
+    -- FIX: Re-linked independent execution start trace check
+    if Config.AutoCollect then
+        startAutoCollectLoop()
     end
 end
 
@@ -1059,28 +1045,11 @@ local function stopAutoFish()
 end
 
 -- =============================================
--- ANTI-AFK (Android Mobile & PC Compatible)
+-- ANTI-AFK
 -- =============================================
-local function bypassAFK()
-    local vu
-    pcall(function() vu = game:GetService("VirtualUser") end)
-    if not vu then return end
-    
-    pcall(function() vu:CaptureController() end)
-    pcall(function() vu:ClickButton2(Vector2.new()) end)
-    pcall(function() vu:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame) end)
-    task.wait(0.2) -- Yield outside pcall to prevent SEH callback crashes
-    pcall(function() vu:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame) end)
-end
-
-player.Idled:Connect(bypassAFK)
-
--- Continuous background simulation loop to prevent AFK triggering on mobile
-task.spawn(function()
-    while true do
-        task.wait(120) -- Trigger screen interaction every 2 minutes
-        bypassAFK()
-    end
+player.Idled:Connect(function()
+    VirtualUser:CaptureController()
+    VirtualUser:ClickButton2(Vector2.new())
 end)
 
 -- =============================================
@@ -1122,16 +1091,6 @@ gpuBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-collectBtn.MouseButton1Click:Connect(function()
-    Config.AutoCollect = not Config.AutoCollect
-    updateModeUI()
-    if Config.AutoCollect then
-        startAutoCollectLoop()
-    else
-        cancelCollectThread()
-    end
-end)
-
 autoSellBtn.MouseButton1Click:Connect(function()
     Config.AutoSellDupes = not Config.AutoSellDupes
     updateModeUI()
@@ -1141,6 +1100,17 @@ autoSellBtn.MouseButton1Click:Connect(function()
         else
             cancelAutoSellThread()
         end
+    end
+end)
+
+-- FIX: Re-instated raw, un-restricted separate loop thread activation
+collectBtn.MouseButton1Click:Connect(function()
+    Config.AutoCollect = not Config.AutoCollect
+    updateModeUI()
+    if Config.AutoCollect then
+        startAutoCollectLoop()
+    else
+        cancelCollectThread()
     end
 end)
 
@@ -1159,4 +1129,4 @@ end)
 -- INIT
 -- =============================================
 updateModeUI()
-print("[Auto Fisher v36] Loaded!")
+print("[Auto Fisher v27] Loaded!")
