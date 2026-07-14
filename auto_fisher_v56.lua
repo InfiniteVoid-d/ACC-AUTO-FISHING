@@ -1861,7 +1861,7 @@ testBtn.MouseButton1Click:Connect(function()
         title = "🧪 Webhook Test Connection Success!",
         description = "Your Roblox ACC Auto-Fisher is successfully linked to this Discord channel! Hook up your AFK loops and enjoy the notifications, LO.",
         color = 65280, -- Green
-        timestamp = DateTime.now():ToISO8601Value(),
+        timestamp = DateTime.now():ToIsoDate(),
         footer = { text = "ACC Auto-Fisher Webhook Diagnostics" }
     }
     sendDiscordWebhook(embed)
@@ -2481,7 +2481,7 @@ function checkAndHopMerchant()
                         title = "🎪 Traveling Merchant Found & Server Hop Stopped!",
                         description = "A server with an active Traveling Merchant has been found. Server hopping has paused.",
                         color = 65280, -- Green
-                        timestamp = DateTime.now():ToISO8601Value(),
+                        timestamp = DateTime.now():ToIsoDate(),
                         fields = {
                             { name = "⏱️ Time Remaining", value = string.format("%d minutes, %d seconds", minutesLeft, secondsLeft), inline = true },
                             { name = "🏷️ Server ID", value = string.format("`%s`", game.JobId), inline = true },
@@ -2571,7 +2571,7 @@ local function checkAndSendFishWebhook(fullName)
             title = reason .. " - " .. fullName,
             description = "Your auto-fisher just reeled in a special catch in ACC!",
             color = colorMap[mutation] or 16777215,
-            timestamp = DateTime.now():ToISO8601Value(),
+            timestamp = DateTime.now():ToIsoDate(),
             fields = {
                 { name = "🐟 Fish Name", value = cleanName, inline = true },
                 { name = "✨ Mutation", value = mutation, inline = true },
@@ -3226,7 +3226,7 @@ function startAutoCollectTokensLoop()
                                 title = "🎪 Traveling Merchant Spawned!",
                                 description = "A new Traveling Merchant has appeared in the plaza!",
                                 color = 16711850, -- 0xff00aa
-                                timestamp = DateTime.now():ToISO8601Value(),
+                                timestamp = DateTime.now():ToIsoDate(),
                                 fields = {
                                     { name = "⏱️ Time Remaining", value = string.format("%d minutes, %d seconds", minutesLeft, secondsLeft), inline = true },
                                     { name = "🏷️ Server ID", value = string.format("`%s`", game.JobId), inline = true },
