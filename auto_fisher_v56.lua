@@ -1854,6 +1854,9 @@ testBtn.Parent = discordCard
 Instance.new("UICorner", testBtn).CornerRadius = UDim.new(0, 4)
 
 testBtn.MouseButton1Click:Connect(function()
+    Config.DiscordWebhookUrl = urlInput.Text
+    saveSettings()
+    
     local embed = {
         title = "🧪 Webhook Test Connection Success!",
         description = "Your Roblox ACC Auto-Fisher is successfully linked to this Discord channel! Hook up your AFK loops and enjoy the notifications, LO.",
@@ -2272,7 +2275,10 @@ end
 -- Discord Webhook Sender
 function sendDiscordWebhook(embed)
     local url = Config.DiscordWebhookUrl
-    if not url or url == "" then return end
+    if not url or url == "" then 
+        warn("[Webhook] Cancelled: No Webhook URL set.")
+        return 
+    end
     url = url:gsub("%s+", "") -- strip spaces
     
     local payload = {
@@ -2281,10 +2287,11 @@ function sendDiscordWebhook(embed)
         embeds = { embed }
     }
     
-    local req = syn and syn.request or http and http.request or request
+    local req = (syn and syn.request) or (http and http.request) or http_request or request or HttpRequest
     if req then
+        setDebug("Sending Webhook notification...")
         task.spawn(function()
-            pcall(req, {
+            local success, err = pcall(req, {
                 Url = url,
                 Method = "POST",
                 Headers = {
@@ -2292,7 +2299,14 @@ function sendDiscordWebhook(embed)
                 },
                 Body = game:GetService("HttpService"):JSONEncode(payload)
             })
+            if success then
+                setDebug("Webhook notification sent successfully!")
+            else
+                warn("[Webhook] Request failed: " .. tostring(err))
+            end
         end)
+    else
+        warn("[Webhook] Failed: Your executor does not support HTTP requests (no request/http_request/HttpRequest function found).")
     end
 end
 
