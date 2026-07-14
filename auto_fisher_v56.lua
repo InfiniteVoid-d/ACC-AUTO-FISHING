@@ -89,7 +89,8 @@ Config = {
     
     -- Auto Sell Duplicate Fish
     AutoSellDupes = false,
-    ProtectIngredients = true, -- Protect cooking/crafting ingredients
+    ProtectCookingIngredients = true, -- Protect cooking ingredients
+    ProtectRodIngredients = true,     -- Protect rod crafting requirements
 
     -- Auto Collect drops & card display wall cash
     AutoCollect = false,
@@ -115,7 +116,7 @@ Config = {
     
     -- Auto Cook & Rod Settings
     AutoCook = false,
-    AutoCookTarget = "CrispyFriedFish",
+    AutoCookTarget = "Auto All",
     AutoUpgradeRod = false,
     
     -- UI Scale
@@ -554,7 +555,7 @@ automationTab.Position = UDim2.new(0, 10, 0, 10)
 automationTab.BackgroundTransparency = 1
 automationTab.BorderSizePixel = 0
 automationTab.ScrollBarThickness = 4
-automationTab.CanvasSize = UDim2.new(0, 0, 0, 1060)
+automationTab.CanvasSize = UDim2.new(0, 0, 0, 1078)
 automationTab.Parent = mainPanel
 tabFrames["Automation"] = automationTab
 
@@ -1013,7 +1014,7 @@ end)
 -- =============================================
 
 -- Card Container for Toggles (Height 175, fitting all toggles plus the Wish Type selector)
-local autoCard = createCard(automationTab, "AUTOMATION MODULES", UDim2.new(1, -10, 0, 230), UDim2.new(0, 0, 0, 0))
+local autoCard = createCard(automationTab, "AUTOMATION MODULES", UDim2.new(1, -10, 0, 248), UDim2.new(0, 0, 0, 0))
 
 function createGridToggle(cardParent, labelText, position, size, initialValue, onToggle)
     local row = Instance.new("Frame")
@@ -1073,40 +1074,44 @@ createGridToggle(autoCard, "💰 Sell Duplicate Fish", UDim2.new(0, 0, 0, 56), U
     end
 end)
 
-createGridToggle(autoCard, "🪙 Collect Map Tokens", UDim2.new(0, 0, 0, 92), UDim2.new(1, 0, 0, 18), Config.AutoCollectTokens, function(val)
+createGridToggle(autoCard, "🍳 Protect Cooking", UDim2.new(0, 0, 0, 74), UDim2.new(1, 0, 0, 18), Config.ProtectCookingIngredients, function(val)
+    Config.ProtectCookingIngredients = val
+end)
+
+createGridToggle(autoCard, "🎣 Protect Rod Craft", UDim2.new(0, 0, 0, 92), UDim2.new(1, 0, 0, 18), Config.ProtectRodIngredients, function(val)
+    Config.ProtectRodIngredients = val
+end)
+
+createGridToggle(autoCard, "🪙 Collect Map Tokens", UDim2.new(0, 0, 0, 110), UDim2.new(1, 0, 0, 18), Config.AutoCollectTokens, function(val)
     Config.AutoCollectTokens = val
     if autoFishing then
         startAutoCollectTokensLoop()
     end
 end)
 
-createGridToggle(autoCard, "🏺 Auto Craft Relics", UDim2.new(0, 0, 0, 110), UDim2.new(1, 0, 0, 18), Config.AutoRelics, function(val)
+createGridToggle(autoCard, "🏺 Auto Craft Relics", UDim2.new(0, 0, 0, 128), UDim2.new(1, 0, 0, 18), Config.AutoRelics, function(val)
     Config.AutoRelics = val
     if val then startAutoRelicsLoop() else cancelAutoRelicsThread() end
 end)
 
-createGridToggle(autoCard, "🐉 Collect Dragon Balls", UDim2.new(0, 0, 0, 128), UDim2.new(1, 0, 0, 18), Config.AutoCollectDragonBalls, function(val)
+createGridToggle(autoCard, "🐉 Collect Dragon Balls", UDim2.new(0, 0, 0, 146), UDim2.new(1, 0, 0, 18), Config.AutoCollectDragonBalls, function(val)
     Config.AutoCollectDragonBalls = val
     if autoFishing then
         startAutoCollectTokensLoop()
     end
 end)
 
-createGridToggle(autoCard, "🐉 Auto Wish (Shenron)", UDim2.new(0, 0, 0, 146), UDim2.new(1, 0, 0, 18), Config.AutoWish, function(val)
+createGridToggle(autoCard, "🐉 Auto Wish (Shenron)", UDim2.new(0, 0, 0, 164), UDim2.new(1, 0, 0, 18), Config.AutoWish, function(val)
     Config.AutoWish = val
     if autoFishing then
         startAutoCollectTokensLoop()
     end
 end)
 
-createGridToggle(autoCard, "🛡️ Protect Ingredients", UDim2.new(0, 0, 0, 74), UDim2.new(1, 0, 0, 18), Config.ProtectIngredients, function(val)
-    Config.ProtectIngredients = val
-end)
-
 -- Wish Type Selection Row
 local wishRow = Instance.new("Frame")
 wishRow.Size = UDim2.new(1, -16, 0, 20)
-wishRow.Position = UDim2.new(0, 0, 0, 166)
+wishRow.Position = UDim2.new(0, 0, 0, 184)
 wishRow.BackgroundTransparency = 1
 wishRow.Parent = autoCard
 
@@ -1135,7 +1140,7 @@ Instance.new("UICorner", wishTypeBtn).CornerRadius = UDim.new(0, 4)
 -- UI Scale Slider Row
 local scaleRow = Instance.new("Frame")
 scaleRow.Size = UDim2.new(1, -16, 0, 20)
-scaleRow.Position = UDim2.new(0, 0, 0, 194)
+scaleRow.Position = UDim2.new(0, 0, 0, 212)
 scaleRow.BackgroundTransparency = 1
 scaleRow.Parent = autoCard
 
@@ -1214,7 +1219,7 @@ end)
 -- =============================================
 -- PETS & QUESTS AUTOMATION CARD (Y = 198, Height 123)
 -- =============================================
-local petEggCard = createCard(automationTab, "PETS & QUESTS AUTOMATION", UDim2.new(1, -10, 0, 123), UDim2.new(0, 0, 0, 235))
+local petEggCard = createCard(automationTab, "PETS & QUESTS AUTOMATION", UDim2.new(1, -10, 0, 123), UDim2.new(0, 0, 0, 253))
 
 createGridToggle(petEggCard, "🐾 Auto Roll Pet Eggs", UDim2.new(0, 0, 0, 20), UDim2.new(1, 0, 0, 18), Config.AutoRollPets, function(val)
     Config.AutoRollPets = val
@@ -1292,7 +1297,7 @@ end)
 -- =============================================
 -- AUTO PACK OPENER CARD (Y = 326, Height 95)
 -- =============================================
-local packOpenerCard = createCard(automationTab, "AUTO PACK OPENER", UDim2.new(1, -10, 0, 95), UDim2.new(0, 0, 0, 363))
+local packOpenerCard = createCard(automationTab, "AUTO PACK OPENER", UDim2.new(1, -10, 0, 95), UDim2.new(0, 0, 0, 381))
 
 createGridToggle(packOpenerCard, "📦 Auto Place/Open Packs", UDim2.new(0, 0, 0, 20), UDim2.new(1, 0, 0, 18), Config.AutoPackOpener, function(val)
     Config.AutoPackOpener = val
@@ -1348,7 +1353,7 @@ end)
 -- =============================================
 -- COOKING & ROD AUTOMATION CARD (Y = 463, Height 95)
 -- =============================================
-local cookCard = createCard(automationTab, "COOKING & ROD AUTOMATION", UDim2.new(1, -10, 0, 95), UDim2.new(0, 0, 0, 463))
+local cookCard = createCard(automationTab, "COOKING & ROD AUTOMATION", UDim2.new(1, -10, 0, 95), UDim2.new(0, 0, 0, 481))
 
 createGridToggle(cookCard, "🍳 Auto Cooking Manager", UDim2.new(0, 0, 0, 20), UDim2.new(1, 0, 0, 18), Config.AutoCook, function(val)
     Config.AutoCook = val
@@ -1379,15 +1384,16 @@ local cookTargetBtn = Instance.new("TextButton")
 cookTargetBtn.Size = UDim2.new(0, 115, 0, 16)
 cookTargetBtn.Position = UDim2.new(1, -115, 0.5, -8)
 cookTargetBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
-cookTargetBtn.Text = "Target: Crispy Fried Fish"
+cookTargetBtn.Text = "Target: Auto All"
 cookTargetBtn.TextColor3 = Color3.fromRGB(0, 220, 120)
 cookTargetBtn.TextSize = 8
 cookTargetBtn.Font = Enum.Font.GothamBold
 cookTargetBtn.Parent = cookTargetRow
 Instance.new("UICorner", cookTargetBtn).CornerRadius = UDim.new(0, 4)
 
-local recipesList = {"CrispyFriedFish", "FishPorridge", "FishStew", "SteamFish", "FishPlatter"}
+local recipesList = {"Auto All", "CrispyFriedFish", "FishPorridge", "FishStew", "SteamFish", "FishPlatter"}
 local recipeDisplayNames = {
+    ["Auto All"] = "Auto All",
     CrispyFriedFish = "Crispy Fried Fish",
     FishPorridge = "Fish Porridge",
     FishStew = "Fish Stew",
@@ -1413,7 +1419,7 @@ end)
 -- AUTO RAID CARD (Y = 563, Height 130)
 -- =============================================
 do -- scope block to reduce top-level local register count
-local raidCard = createCard(automationTab, "AUTO RAID AUTOMATION", UDim2.new(1, -10, 0, 130), UDim2.new(0, 0, 0, 563))
+local raidCard = createCard(automationTab, "AUTO RAID AUTOMATION", UDim2.new(1, -10, 0, 130), UDim2.new(0, 0, 0, 581))
 
 
 createGridToggle(raidCard, "⚔️ Auto Join/Start Raids", UDim2.new(0, 0, 0, 20), UDim2.new(1, 0, 0, 18), Config.AutoRaid, function(val)
@@ -1542,7 +1548,7 @@ end -- end promo code scope block
 -- AUTO CARD GRADING CARD (Y = 728)
 -- =============================================
 do -- scope block for grading card UI
-gradingCard = createCard(automationTab, "AUTO CARD GRADING", UDim2.new(1, -10, 0, 180), UDim2.new(0, 0, 0, 728))
+gradingCard = createCard(automationTab, "AUTO CARD GRADING", UDim2.new(1, -10, 0, 180), UDim2.new(0, 0, 0, 746))
 
 -- Grading Mode Row
 local modeRow = Instance.new("Frame")
@@ -1685,7 +1691,7 @@ end -- end grading card scope block
 -- AUTO VOYAGE CARD (Y = 660, Height 110)
 -- =============================================
 do -- scope block for Voyage UI
-local voyageCard = createCard(automationTab, "AUTO VOYAGE AUTOMATION", UDim2.new(1, -10, 0, 110), UDim2.new(0, 0, 0, 913))
+local voyageCard = createCard(automationTab, "AUTO VOYAGE AUTOMATION", UDim2.new(1, -10, 0, 110), UDim2.new(0, 0, 0, 931))
 
 createGridToggle(voyageCard, "⚓ Auto Voyages", UDim2.new(0, 0, 0, 20), UDim2.new(1, 0, 0, 18), Config.AutoVoyage, function(val)
     Config.AutoVoyage = val
@@ -1738,7 +1744,7 @@ end -- end voyage card scope block
 
 -- Track the dynamic content size to expand scroll height if items change
 automationTab:GetPropertyChangedSignal("AbsoluteWindowSize"):Connect(function()
-    automationTab.CanvasSize = UDim2.new(0, 0, 0, 1060)
+    automationTab.CanvasSize = UDim2.new(0, 0, 0, 1078)
 end)
 
 
@@ -2141,33 +2147,53 @@ end
 
 -- Auto Cooking Helper
 function checkAutoCooking()
-    local targetRecipe = Config.AutoCookTarget or "CrispyFriedFish"
+    local targetRecipe = Config.AutoCookTarget or "Auto All"
     local FishConfig = require(ReplicatedStorage.Modules.Config.Core.FishConfig)
-    local recipe = FishConfig.Recipes[targetRecipe]
-    if not recipe then return end
+    
+    local toCheck = {}
+    if targetRecipe == "Auto All" then
+        toCheck = {
+            "FishPlatter",
+            "SteamFish",
+            "FishStew",
+            "FishPorridge",
+            "CrispyFriedFish"
+        }
+    else
+        toCheck = {targetRecipe}
+    end
     
     local tokens = ReplicatedData.GetData("FishTokens") or 0
-    if tokens >= recipe.Price then
-        local fishInv = ReplicatedData.GetData("Fish") or {}
-        local equipped = ReplicatedData.GetData("FishEquipped") or {}
-        local canCook = true
-        
-        for fName, reqAmt in pairs(recipe.Requirements) do
-            local fishData = fishInv[fName]
-            local locked = fishData and fishData.Locked or false
-            local isEquipped = table.find(equipped, fName) ~= nil
-            local availableAmt = (locked or isEquipped) and 0 or (fishData and fishData.Amount or 0)
-            
-            if availableAmt < reqAmt then
+    local fishInv = ReplicatedData.GetData("Fish") or {}
+    local equipped = ReplicatedData.GetData("FishEquipped") or {}
+    
+    for _, recipeName in ipairs(toCheck) do
+        local recipe = FishConfig.Recipes[recipeName]
+        if recipe and tokens >= recipe.Price then
+            local canCook = true
+            local items = recipe.Ingredients or recipe.Requirements
+            if items then
+                for fName, reqAmt in pairs(items) do
+                    local fishData = fishInv[fName]
+                    local locked = fishData and fishData.Locked or false
+                    local isEquipped = table.find(equipped, fName) ~= nil
+                    local availableAmt = (locked or isEquipped) and 0 or (fishData and fishData.Amount or 0)
+                    
+                    if availableAmt < reqAmt then
+                        canCook = false
+                        break
+                    end
+                end
+            else
                 canCook = false
+            end
+            
+            if canCook then
+                setDebug("Auto-Cooking: " .. recipeName)
+                ReplicatedStorage.Remotes.Fish:FireServer("Cook", recipeName)
+                task.wait(1.0)
                 break
             end
-        end
-        
-        if canCook then
-            setDebug("Auto-Cooking: " .. targetRecipe)
-            ReplicatedStorage.Remotes.Fish:FireServer("Cook", targetRecipe)
-            task.wait(1.0)
         end
     end
 end
@@ -2966,7 +2992,8 @@ function getInventory()
 end
 
 local function getRequiredIngredients()
-    local req = {}
+    local cookReq = {}
+    local rodReq = {}
     pcall(function()
         local FishConfig = require(ReplicatedStorage.Modules.Config.Core.FishConfig)
         if FishConfig.Recipes then
@@ -2974,7 +3001,7 @@ local function getRequiredIngredients()
                 local items = r.Ingredients or r.Requirements
                 if items then
                     for fName, amt in pairs(items) do
-                        req[fName] = math.max(req[fName] or 0, amt)
+                        cookReq[fName] = math.max(cookReq[fName] or 0, amt)
                     end
                 end
             end
@@ -2984,17 +3011,17 @@ local function getRequiredIngredients()
                 local items = r.Ingredients or r.Requirements
                 if items then
                     for fName, amt in pairs(items) do
-                        req[fName] = math.max(req[fName] or 0, amt)
+                        rodReq[fName] = math.max(rodReq[fName] or 0, amt)
                     end
                 end
             end
         end
     end)
-    return req
+    return cookReq, rodReq
 end
 
 function sellDuplicates()
-    local req = Config.ProtectIngredients and getRequiredIngredients() or {}
+    local cookReq, rodReq = getRequiredIngredients()
     local fishList = getInventory()
     if #fishList == 0 then
         return 0
@@ -3004,7 +3031,15 @@ function sellDuplicates()
     for _, fishData in ipairs(fishList) do
         if not Config.AutoSellDupes or not autoFishing then break end
 
-        local targetKeep = (Config.ProtectIngredients and req[fishData.name]) and fishData.amount or 1
+        local protect = false
+        if Config.ProtectCookingIngredients and cookReq[fishData.name] then
+            protect = true
+        end
+        if Config.ProtectRodIngredients and rodReq[fishData.name] then
+            protect = true
+        end
+
+        local targetKeep = protect and fishData.amount or 1
         local sellCount = fishData.amount - targetKeep
         if sellCount > 0 then
             setDebug("Auto-Selling " .. fishData.name .. " x" .. sellCount)
