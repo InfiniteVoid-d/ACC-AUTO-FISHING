@@ -3559,6 +3559,28 @@ end
 local function getRequiredIngredients()
     local cookReq = {}
     local rodReq = {}
+    
+    -- Static Fallback lists to guarantee exclusion safety for all cooking recipe fish
+    local cookingExclusions = {
+        ["Tilapia"] = 1,
+        ["Tuna"] = 1,
+        ["Mackerel"] = 2,
+        ["Trout"] = 2,
+        ["Catfish"] = 2,
+        ["Golden Shiner"] = 2,
+        ["Koi"] = 5,
+        ["Flying Fish"] = 2,
+        ["Moonfish"] = 2,
+        ["Flounder"] = 1,
+        ["Sole"] = 3,
+        ["Rockfish"] = 2,
+        ["Pangasius Catfish"] = 1
+    }
+    
+    for fName, amt in pairs(cookingExclusions) do
+        cookReq[fName] = amt
+    end
+    
     pcall(function()
         local FishConfig = require(ReplicatedStorage.Modules.Config.Core.FishConfig)
         if FishConfig.Recipes then
