@@ -2145,6 +2145,58 @@ function getBestRaidCards()
     return result
 end
 
+-- Get remaining active duration of a cooking buff in seconds
+local function getRecipeRemainingTime(recipeName)
+    local remaining = 0
+    pcall(function()
+        -- 1. Try reading from replicated replica data cache
+        local buffs = ReplicatedData.GetData("Buffs") or ReplicatedData.GetData("CookBuffs") or ReplicatedData.GetData("Cooking") or ReplicatedData.GetData("ActiveBuffs")
+        if buffs and buffs[recipeName] then
+            local val = buffs[recipeName]
+            if type(val) == "number" then
+                if val > 1700000000 then
+                    remaining = math.max(0, val - os.time())
+                else
+                    remaining = val
+                end
+            elseif type(val) == "table" then
+                local endTime = val.EndTime or val.Expire or val.Time or val.Duration
+                if endTime then
+                    if endTime > 1700000000 then
+                        remaining = math.max(0, endTime - os.time())
+                    else
+                        remaining = endTime
+                    end
+                end
+            end
+        end
+    end)
+    
+    -- 2. Fallback: Parse timers from player UI descendants
+    if remaining <= 0 then
+        pcall(function()
+            local mainGui = PlayerGui:FindFirstChild("Main") or PlayerGui:FindFirstChild("UI") or PlayerGui:FindFirstChild("MainGui")
+            if mainGui then
+                for _, desc in ipairs(mainGui:GetDescendants()) do
+                    if desc:IsA("TextLabel") and desc.Visible then
+                        local parentName = desc.Parent and desc.Parent.Name or ""
+                        if parentName:lower():find(recipeName:lower()) or desc.Name:lower():find("timer") then
+                            local text = desc.Text or ""
+                            local min, sec = text:match("(%d+):(%d+)")
+                            if min and sec then
+                                remaining = tonumber(min) * 60 + tonumber(sec)
+                                break
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+    end
+    
+    return remaining
+end
+
 -- Auto Cooking Helper
 function checkAutoCooking()
     local targetRecipe = Config.AutoCookTarget or "Auto All"
@@ -2168,31 +2220,34 @@ function checkAutoCooking()
     local equipped = ReplicatedData.GetData("FishEquipped") or {}
     
     for _, recipeName in ipairs(toCheck) do
-        local recipe = FishConfig.Recipes[recipeName]
-        if recipe and tokens >= recipe.Price then
-            local canCook = true
-            local items = recipe.Ingredients or recipe.Requirements
-            if items then
-                for fName, reqAmt in pairs(items) do
-                    local fishData = fishInv[fName]
-                    local locked = fishData and fishData.Locked or false
-                    local isEquipped = table.find(equipped, fName) ~= nil
-                    local availableAmt = (locked or isEquipped) and 0 or (fishData and fishData.Amount or 0)
-                    
-                    if availableAmt < reqAmt then
-                        canCook = false
-                        break
+        local remaining = getRecipeRemainingTime(recipeName)
+        if remaining < 10 then -- Only cook if buff is not active or has less than 10 seconds remaining
+            local recipe = FishConfig.Recipes[recipeName]
+            if recipe and tokens >= recipe.Price then
+                local canCook = true
+                local items = recipe.Ingredients or recipe.Requirements
+                if items then
+                    for fName, reqAmt in pairs(items) do
+                        local fishData = fishInv[fName]
+                        local locked = fishData and fishData.Locked or false
+                        local isEquipped = table.find(equipped, fName) ~= nil
+                        local availableAmt = (locked or isEquipped) and 0 or (fishData and fishData.Amount or 0)
+                        
+                        if availableAmt < reqAmt then
+                            canCook = false
+                            break
+                        end
                     end
+                else
+                    canCook = false
                 end
-            else
-                canCook = false
-            end
-            
-            if canCook then
-                setDebug("Auto-Cooking: " .. recipeName)
-                ReplicatedStorage.Remotes.Fish:FireServer("Cook", recipeName)
-                task.wait(1.0)
-                break
+                
+                if canCook then
+                    setDebug("Auto-Cooking: " .. recipeName)
+                    ReplicatedStorage.Remotes.Fish:FireServer("Cook", recipeName)
+                    task.wait(1.0)
+                    break -- Cooked one, exit loop
+                end
             end
         end
     end

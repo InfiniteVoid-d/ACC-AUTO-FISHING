@@ -192,6 +192,28 @@ In the v64 update, we implemented automatic settings preservation so that the pl
   - Instead of adding saving lines to 50+ individual button click connections (which would clutter the code and increase the top-level register count beyond the 200 limit), we implemented a lightweight, periodic background daemon (`task.spawn`).
   - Every 2 seconds, the daemon performs a fast JSON check on the `Config` table. If it detects a difference from the last saved state, it writes the updated table to disk (debounced autosaving). This handles all sliders, toggles, text boxes, and dropdown values effortlessly with 100% coverage and zero UI lag.
 
+---
+
+## v65: Separate Exclusions & Auto All Cooking Manager
+
+In the v65 update, we split the ingredient protection system into separate Cooking and Rod crafting toggles, and added a smart "Auto All" cooking target.
+
+### 1. Split Ingredient Protection Toggles
+- **Problem:** Previously, the single "Protect Ingredients" option locked 100% of both cooking and rod crafting ingredients. If a player wanted to sell off common fish duplicates (like Roach or Chub) to make cash while still keeping Tilapia/Tuna for cooking luck, they couldn't. 
+- **Solution:** 
+  - Split the configuration into `Config.ProtectCookingIngredients` and `Config.ProtectRodIngredients`.
+  - Added two separate UI toggles in the Automation Modules card: `"🍳 Protect Cooking"` and `"🎣 Protect Rod Craft"`.
+  - The `sellDuplicates()` engine evaluates these separately, allowing players to hoard cooking ingredients for luck stacks while safely purging rod crafting fish for Yen (or vice versa).
+  - Shifted all other toggles and rows in the grid container down by 18 pixels and updated the `automationTab` CanvasSize dynamically to `1078`.
+
+### 2. "Auto All" Cooking Target
+- **Problem:** The auto-cooker was locked to a single selected recipe target. If the player went AFK and ran out of ingredients for that specific target, the auto-cooker stopped completely, wasting valuable AFK time.
+- **Solution:** 
+  - Added a new target option `"Auto All"` (set as the default).
+  - When `"Auto All"` is selected, the cooking loop automatically evaluates all available recipes in descending order of luck power (Platter -> Steam Fish -> Stew -> Porridge -> Crispy Fried Fish). 
+  - If you have the required tokens and fish ingredients for the best possible dish, the loop fires the cook remote, letting you automatically cook whatever is available in your inventory while AFK!
+
+
 
 
 
