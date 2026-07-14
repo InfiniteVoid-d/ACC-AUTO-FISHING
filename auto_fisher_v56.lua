@@ -128,6 +128,7 @@ Config = {
     NotifyRareCatches = false,
     NotifyNewIndex = false,
     MinMutationNotify = "Rainbow",
+    MerchantHop = false,
     
     PetEggType = "Basic",
     PetRollMethod = "Roll5",
@@ -205,6 +206,7 @@ end
 
 -- Load previous settings on startup
 loadSettings()
+task.spawn(checkAndHopMerchant)
 
 -- Periodically autosave settings if they change
 task.spawn(function()
@@ -563,7 +565,7 @@ automationTab.Position = UDim2.new(0, 10, 0, 10)
 automationTab.BackgroundTransparency = 1
 automationTab.BorderSizePixel = 0
 automationTab.ScrollBarThickness = 4
-automationTab.CanvasSize = UDim2.new(0, 0, 0, 1208)
+automationTab.CanvasSize = UDim2.new(0, 0, 0, 1228)
 automationTab.Parent = mainPanel
 tabFrames["Automation"] = automationTab
 
@@ -1751,7 +1753,7 @@ updateVoyagePackUI()
 end -- end voyage card scope block
 
 do -- scope block for Discord Webhook UI
-local discordCard = createCard(automationTab, "DISCORD NOTIFICATIONS", UDim2.new(1, -10, 0, 145), UDim2.new(0, 0, 0, 1048))
+local discordCard = createCard(automationTab, "DISCORD NOTIFICATIONS", UDim2.new(1, -10, 0, 165), UDim2.new(0, 0, 0, 1048))
 
 -- Webhook URL TextBox
 local urlFrame = Instance.new("Frame")
@@ -1833,10 +1835,17 @@ mutBtn.MouseButton1Click:Connect(function()
     saveSettings()
 end)
 
+createGridToggle(discordCard, "⚡ Hop for Merchant", UDim2.new(0, 0, 0, 118), UDim2.new(1, 0, 0, 16), Config.MerchantHop, function(val)
+    Config.MerchantHop = val
+    if val then
+        task.spawn(checkAndHopMerchant)
+    end
+end)
+
 -- Test Webhook Button
 local testBtn = Instance.new("TextButton")
 testBtn.Size = UDim2.new(1, -16, 0, 18)
-testBtn.Position = UDim2.new(0, 8, 0, 118)
+testBtn.Position = UDim2.new(0, 8, 0, 138)
 testBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 220)
 testBtn.Text = "🧪 Send Test Webhook Message"
 testBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -1860,7 +1869,7 @@ end -- end discord card scope block
 
 -- Track the dynamic content size to expand scroll height if items change
 automationTab:GetPropertyChangedSignal("AbsoluteWindowSize"):Connect(function()
-    automationTab.CanvasSize = UDim2.new(0, 0, 0, 1208)
+    automationTab.CanvasSize = UDim2.new(0, 0, 0, 1228)
 end)
 
 
@@ -2292,15 +2301,17 @@ end
 local function getMerchantStock()
     local stock = {}
     pcall(function()
-        local items = ReplicatedData.GetData("MerchantStock") or ReplicatedData.GetData("MerchantItems") or ReplicatedData.GetData("Merchant")
-        if items then
-            for k, v in pairs(items) do
-                if type(v) == "table" then
-                    local name = v.Name or v.Item or tostring(k)
-                    local price = v.Price or v.Cost or 0
-                    table.insert(stock, { Name = name, Price = price })
-                elseif type(v) == "number" then
-                    table.insert(stock, { Name = tostring(k), Price = v })
+        local getMerchantItems = ReplicatedStorage:FindFirstChild("Remotes") and ReplicatedStorage.Remotes:FindFirstChild("GetMerchantItems")
+        if getMerchantItems then
+            local items = getMerchantItems:InvokeServer()
+            if items then
+                for _, itemData in pairs(items) do
+                    if type(itemData) == "table" then
+                        local name = itemData.Item or itemData.Name or "Unknown Item"
+                        local category = itemData.Category or itemData.Type or "General"
+                        local price = itemData.Price or itemData.Cost or "Unknown"
+                        table.insert(stock, { Name = name, Category = category, Price = price })
+                    end
                 end
             end
         end
@@ -2308,11 +2319,28 @@ local function getMerchantStock()
     
     if #stock == 0 then
         pcall(function()
+            local items = ReplicatedData.GetData("MerchantStock") or ReplicatedData.GetData("MerchantItems") or ReplicatedData.GetData("Merchant")
+            if items then
+                for k, v in pairs(items) do
+                    if type(v) == "table" then
+                        local name = v.Name or v.Item or tostring(k)
+                        local price = v.Price or v.Cost or 0
+                        table.insert(stock, { Name = name, Category = "General", Price = price })
+                    elseif type(v) == "number" then
+                        table.insert(stock, { Name = tostring(k), Category = "General", Price = v })
+                    end
+                end
+            end
+        end)
+    end
+    
+    if #stock == 0 then
+        pcall(function()
             local npc = workspace:FindFirstChild("Traveling Merchant") or workspace:FindFirstChild("TravelingMerchant")
             if npc then
                 for _, desc in ipairs(npc:GetDescendants()) do
                     if desc:IsA("TextLabel") and desc.Visible and desc.Text ~= "" and not desc.Text:find(":") then
-                        table.insert(stock, { Name = desc.Text, Price = "Unknown" })
+                        table.insert(stock, { Name = desc.Text, Category = "NPC Visual", Price = "Unknown" })
                     end
                 end
             end
@@ -2320,6 +2348,143 @@ local function getMerchantStock()
     end
     
     return stock
+end
+
+-- Merchant Server Hopper Function
+function hopServer()
+    local PLACE_ID = 76285745979410
+    local TeleportService = game:GetService("TeleportService")
+    local HttpService = game:GetService("HttpService")
+    
+    setDebug("Fetching public server list to hop...")
+    
+    local visitedServers = {}
+    pcall(function()
+        local data = TeleportService:GetLocalPlayerTeleportData()
+        if type(data) == "table" and data.visited then
+            visitedServers = data.visited
+        end
+    end)
+    visitedServers[game.JobId] = true
+    
+    local url = ("https://games.roblox.com/v1/games/%s/servers/Public?sortOrder=Asc&limit=100"):format(PLACE_ID)
+    
+    local function fetchPage(fetchUrl)
+        for attempt = 1, 3 do
+            task.wait(1.5)
+            local s, r = pcall(function() return HttpService:JSONDecode(game:HttpGetAsync(fetchUrl)) end)
+            if s and r and not r.errors and r.data then return r end
+            warn("[Hopper] Fetch attempt " .. attempt .. " failed. Retrying...")
+        end
+        return nil
+    end
+    
+    local page = fetchPage(url)
+    local availableServers = {}
+    if page and page.data then
+        for _, server in ipairs(page.data) do
+            if server.playing < server.maxPlayers and not visitedServers[server.id] then
+                table.insert(availableServers, server)
+            end
+        end
+    end
+    
+    if #availableServers == 0 then
+        setDebug("Clearing visited list and retrying server hop...")
+        visitedServers = {}
+        visitedServers[game.JobId] = true
+        task.wait(1.0)
+        if page and page.data then
+            for _, server in ipairs(page.data) do
+                if server.playing < server.maxPlayers and server.id ~= game.JobId then
+                    table.insert(availableServers, server)
+                end
+            end
+        end
+    end
+    
+    if #availableServers > 0 then
+        local target = availableServers[math.random(1, #availableServers)]
+        visitedServers[target.id] = true
+        setDebug("Hopping to server (" .. target.playing .. "/" .. target.maxPlayers .. ")")
+        pcall(function()
+            TeleportService:TeleportToPlaceInstance(PLACE_ID, target.id, player, nil, {visited = visitedServers})
+        end)
+    else
+        setDebug("No servers found. Retrying in 5s...")
+        task.wait(5.0)
+        hopServer()
+    end
+end
+
+-- Check Merchant and Hop
+function checkAndHopMerchant()
+    if not Config.MerchantHop then return end
+    
+    setDebug("Waiting 3.5s to verify Traveling Merchant stand...")
+    task.wait(3.5)
+    
+    local hasStand = false
+    pcall(function()
+        local Items = workspace:WaitForChild("Items", 10)
+        local MerchantFolder = Items and Items:WaitForChild("Merchant", 5)
+        local ClientFolder = MerchantFolder and MerchantFolder:WaitForChild("Client", 5)
+        hasStand = ClientFolder and ClientFolder:WaitForChild("MerchantStand", 5) ~= nil
+    end)
+    
+    if hasStand then
+        setDebug("✅ Traveling Merchant Found! Pausing server hop.")
+        
+        -- Play notification sound
+        pcall(function()
+            local sound = Instance.new("Sound")
+            sound.SoundId = "rbxassetid://9120386446"
+            sound.Volume = 1.0
+            sound.Parent = workspace
+            sound:Play()
+            game:GetService("Debris"):AddItem(sound, 6)
+        end)
+        
+        -- Send notification to Discord Webhook
+        if Config.NotifyMerchant then
+            pcall(function()
+                local merchantTime = ReplicatedData.GetData("MerchantTime") or 0
+                if lastNotifiedMerchantTime ~= merchantTime then
+                    lastNotifiedMerchantTime = merchantTime
+                    local stock = getMerchantStock()
+                    local stockListText = ""
+                    if #stock > 0 then
+                        for _, item in ipairs(stock) do
+                            stockListText = stockListText .. string.format("• **%s** (%s) - Cost: %s\n", item.Name, item.Category, tostring(item.Price))
+                        end
+                    else
+                        stockListText = "Check in-game to see his rotating stock of Weather Totems, high-value packs, and Potions!"
+                    end
+                    
+                    local minutesLeft = math.floor((merchantTime - os.time()) / 60)
+                    local secondsLeft = (merchantTime - os.time()) % 60
+                    
+                    local embed = {
+                        title = "🎪 Traveling Merchant Found & Server Hop Stopped!",
+                        description = "A server with an active Traveling Merchant has been found. Server hopping has paused.",
+                        color = 65280, -- Green
+                        timestamp = DateTime.now():ToISO8601Value(),
+                        fields = {
+                            { name = "⏱️ Time Remaining", value = string.format("%d minutes, %d seconds", minutesLeft, secondsLeft), inline = true },
+                            { name = "🏷️ Server ID", value = string.format("`%s`", game.JobId), inline = true },
+                            { name = "📦 Stock Selection", value = stockListText, inline = false }
+                        },
+                        footer = { text = "ACC Auto-Fisher Server Hopper" }
+                    }
+                    sendDiscordWebhook(embed)
+                end
+            end)
+        end
+    else
+        setDebug("No Traveling Merchant found in this server. Hopping...")
+        task.wait(1.5)
+        hopServer()
+    end
 end
 
 -- Process Catch Webhook

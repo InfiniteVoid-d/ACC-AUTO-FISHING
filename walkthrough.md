@@ -241,6 +241,23 @@ In the v68 update, we implemented automated Discord Webhook notifications to kee
 - **New Discovery Check:** Compares caught fish against `ReplicatedData.GetData("Pokedex")` to notify the player if they have logged a brand-new species in their index.
 - **Rich Embed Notification:** Fires a custom embed color-coded by mutation type (Gold, Emerald, Void, Diamond, Rainbow) showing the fish name, session catch total, and mutation rank.
 
+---
+
+## v69: Traveling Merchant Server Hopper Integration
+
+In the v69 update, we integrated the Traveling Merchant Server Hopper script shared by the user directly into the master script.
+
+### 1. Traveling Merchant Detection & Stock Scraping Upgrades
+- **Remote Function Invocation:** Upgraded the merchant stock collector `getMerchantStock()` to invoke the server-side remote function `ReplicatedStorage.Remotes.GetMerchantItems:InvokeServer()`. This fetches the exact item names, categories, and costs directly from the server.
+- **Visual & Stand Validation:** Added secondary checks to scan for the physical Traveling Merchant workspace folders (`workspace.Items.Merchant.Client.MerchantStand`) to confirm when a merchant is physically active in the server.
+
+### 2. Auto Server Hop Logic
+- **Server Hopper Toggle:** Added a `"⚡ Hop for Merchant"` toggle at Y = 118 in the Discord Notifications panel, expanding the card height to `165` and `automationTab` ScrollFrame CanvasSize dynamically to `1228`.
+- **Hopper Flow:**
+  - If toggled ON, the script waits 3.5s after load to check for `MerchantStand` in the workspace.
+  - If a merchant is found, it plays a chime sound, pauses server hopping, and (if toggled) sends a Discord alert displaying the exact stock items.
+  - If no merchant is present, it grabs public servers using Roblox API endpoints, filters out full servers and previously visited servers (passed through TeleportData), and hops to a new public server instance.
+
 
 
 
