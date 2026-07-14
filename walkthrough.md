@@ -213,6 +213,34 @@ In the v65 update, we split the ingredient protection system into separate Cooki
   - When `"Auto All"` is selected, the cooking loop automatically evaluates all available recipes in descending order of luck power (Platter -> Steam Fish -> Stew -> Porridge -> Crispy Fried Fish). 
   - If you have the required tokens and fish ingredients for the best possible dish, the loop fires the cook remote, letting you automatically cook whatever is available in your inventory while AFK!
 
+---
+
+## v68: Discord Webhook Notifications Integration
+
+In the v68 update, we implemented automated Discord Webhook notifications to keep players updated on crucial game milestones (Traveling Merchant spawns and Rare Catches/Discoveries) while AFK.
+
+### 1. Dedicated Discord Notification Panel
+- **New UI Card:** Added the `"DISCORD NOTIFICATIONS"` card (Y = 1048, height 145) inside the scrollable **Automation** panel.
+  - **Webhook URL Textbox:** Allows the player to paste their Discord Webhook URL. Whitespace is automatically stripped for safety.
+  - **Notify Merchant Spawns Toggle:** Toggles alerting when the Traveling Merchant arrives.
+  - **Notify Rare Catches Toggle:** Toggles alerting on rare catches and mutations.
+  - **Notify New Discoveries Toggle:** Toggles alerting when new fish index discoveries are caught.
+  - **Min Mutation Dropdown:** Set mutation severity thresholds (`"None"`, `"Gold"`, `"Emerald"`, `"Void"`, `"Diamond"`, `"Rainbow"`).
+  - **Test Button:** Pushes a formatted test diagnostics embed to confirm the connection.
+- **Scroll Expansion:** Updated the `automationTab` ScrollFrame CanvasSize dynamically to `1208` to cleanly encompass the new panel.
+
+### 2. Traveling Merchant Spawn Detector
+- **Spawn Alert:** Monitors `ReplicatedData.GetData("MerchantTime")` inside the background loop. 
+- **Stock Analyzer:** Dynamically crawls the merchant stock in replica cache or scans the billboard GUI on the spawned Traveling Merchant model in the plaza workspace.
+- **Webhook Dispatch:** Sends a rich, magenta-colored embed containing the remaining spawn timer, server Job ID (for quick joining), and detailed stock selections (e.g. specific weather totems, bundles, and potions with prices).
+- **Spam Prevention:** Employs a timestamp check to guarantee only **one** alert is sent per merchant spawn.
+
+### 3. Fish Catch & Discovery Logger
+- **OnClientEvent Hook:** Intercepts incoming catch confirmations inside `Fish.OnClientEvent`.
+- **Rarity Check:** Evaluates whether a caught fish matches the user's selected mutation threshold or meets the criteria for rare catches (such as cash multiplier >= 5.0x, or legendary species like Giant Whale/Sea King).
+- **New Discovery Check:** Compares caught fish against `ReplicatedData.GetData("Pokedex")` to notify the player if they have logged a brand-new species in their index.
+- **Rich Embed Notification:** Fires a custom embed color-coded by mutation type (Gold, Emerald, Void, Diamond, Rainbow) showing the fish name, session catch total, and mutation rank.
+
 
 
 
