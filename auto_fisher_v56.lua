@@ -122,6 +122,13 @@ Config = {
     -- UI Scale
     UIScale = 1.0,
     
+    -- Discord Webhooks
+    DiscordWebhookUrl = "",
+    NotifyMerchant = false,
+    NotifyRareCatches = false,
+    NotifyNewIndex = false,
+    MinMutationNotify = "Rainbow",
+    
     PetEggType = "Basic",
     PetRollMethod = "Roll5",
 
@@ -232,6 +239,7 @@ local collectedTokens = {}
 local uiConnection = nil
 local fishCaught = 0
 local fishSold = 0
+local lastNotifiedMerchantTime = 0
 local sessionStart = 0
 local waitingForCatch = false
 local UICollapsed = false
@@ -555,7 +563,7 @@ automationTab.Position = UDim2.new(0, 10, 0, 10)
 automationTab.BackgroundTransparency = 1
 automationTab.BorderSizePixel = 0
 automationTab.ScrollBarThickness = 4
-automationTab.CanvasSize = UDim2.new(0, 0, 0, 1078)
+automationTab.CanvasSize = UDim2.new(0, 0, 0, 1208)
 automationTab.Parent = mainPanel
 tabFrames["Automation"] = automationTab
 
@@ -1742,9 +1750,117 @@ end)
 updateVoyagePackUI()
 end -- end voyage card scope block
 
+do -- scope block for Discord Webhook UI
+local discordCard = createCard(automationTab, "DISCORD NOTIFICATIONS", UDim2.new(1, -10, 0, 145), UDim2.new(0, 0, 0, 1048))
+
+-- Webhook URL TextBox
+local urlFrame = Instance.new("Frame")
+urlFrame.Size = UDim2.new(1, -16, 0, 18)
+urlFrame.Position = UDim2.new(0, 8, 0, 20)
+urlFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+urlFrame.Parent = discordCard
+Instance.new("UICorner", urlFrame).CornerRadius = UDim.new(0, 4)
+
+local urlInput = Instance.new("TextBox")
+urlInput.Size = UDim2.new(1, -10, 1, 0)
+urlInput.Position = UDim2.new(0, 5, 0, 0)
+urlInput.BackgroundTransparency = 1
+urlInput.Text = Config.DiscordWebhookUrl
+urlInput.PlaceholderText = "Paste Discord Webhook URL here..."
+urlInput.PlaceholderColor3 = Color3.fromRGB(120, 120, 130)
+urlInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+urlInput.TextSize = 8
+urlInput.Font = Enum.Font.Gotham
+urlInput.TextXAlignment = Enum.TextXAlignment.Left
+urlInput.ClearTextOnFocus = false
+urlInput.Parent = urlFrame
+
+urlInput.FocusLost:Connect(function()
+    Config.DiscordWebhookUrl = urlInput.Text
+    saveSettings()
+end)
+
+createGridToggle(discordCard, "🎪 Notify Merchant Spawns", UDim2.new(0, 0, 0, 42), UDim2.new(1, 0, 0, 16), Config.NotifyMerchant, function(val)
+    Config.NotifyMerchant = val
+    if autoFishing then
+        startAutoCollectTokensLoop()
+    end
+end)
+
+createGridToggle(discordCard, "🐋 Notify Rare Catches", UDim2.new(0, 0, 0, 60), UDim2.new(1, 0, 0, 16), Config.NotifyRareCatches, function(val)
+    Config.NotifyRareCatches = val
+end)
+
+createGridToggle(discordCard, "🆕 Notify New Discoveries", UDim2.new(0, 0, 0, 78), UDim2.new(1, 0, 0, 16), Config.NotifyNewIndex, function(val)
+    Config.NotifyNewIndex = val
+end)
+
+-- Min Mutation Selector Row
+local mutRow = Instance.new("Frame")
+mutRow.Size = UDim2.new(1, -16, 0, 18)
+mutRow.Position = UDim2.new(0, 0, 0, 96)
+mutRow.BackgroundTransparency = 1
+mutRow.Parent = discordCard
+
+local mutLabel = Instance.new("TextLabel")
+mutLabel.Size = UDim2.new(1, -105, 1, 0)
+mutLabel.Position = UDim2.new(0, 8, 0, 0)
+mutLabel.BackgroundTransparency = 1
+mutLabel.Text = "✨ Min Mutation Notify:"
+mutLabel.TextColor3 = Color3.fromRGB(200, 200, 210)
+mutLabel.TextSize = 10
+mutLabel.TextXAlignment = Enum.TextXAlignment.Left
+mutLabel.Font = Enum.Font.Gotham
+mutLabel.Parent = mutRow
+
+local mutBtn = Instance.new("TextButton")
+mutBtn.Size = UDim2.new(0, 95, 0, 14)
+mutBtn.Position = UDim2.new(1, -95, 0.5, -7)
+mutBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+mutBtn.Text = "Min: " .. (Config.MinMutationNotify or "Rainbow")
+mutBtn.TextColor3 = Color3.fromRGB(255, 200, 0)
+mutBtn.TextSize = 8
+mutBtn.Font = Enum.Font.GothamBold
+mutBtn.Parent = mutRow
+Instance.new("UICorner", mutBtn).CornerRadius = UDim.new(0, 4)
+
+local mutList = {"None", "Gold", "Emerald", "Void", "Diamond", "Rainbow"}
+mutBtn.MouseButton1Click:Connect(function()
+    local currentIdx = table.find(mutList, Config.MinMutationNotify) or 6
+    local nextIdx = (currentIdx % #mutList) + 1
+    Config.MinMutationNotify = mutList[nextIdx]
+    mutBtn.Text = "Min: " .. Config.MinMutationNotify
+    saveSettings()
+end)
+
+-- Test Webhook Button
+local testBtn = Instance.new("TextButton")
+testBtn.Size = UDim2.new(1, -16, 0, 18)
+testBtn.Position = UDim2.new(0, 8, 0, 118)
+testBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 220)
+testBtn.Text = "🧪 Send Test Webhook Message"
+testBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+testBtn.TextSize = 8
+testBtn.Font = Enum.Font.GothamBold
+testBtn.Parent = discordCard
+Instance.new("UICorner", testBtn).CornerRadius = UDim.new(0, 4)
+
+testBtn.MouseButton1Click:Connect(function()
+    local embed = {
+        title = "🧪 Webhook Test Connection Success!",
+        description = "Your Roblox ACC Auto-Fisher is successfully linked to this Discord channel! Hook up your AFK loops and enjoy the notifications, LO.",
+        color = 65280, -- Green
+        timestamp = DateTime.now():ToISO8601Value(),
+        footer = { text = "ACC Auto-Fisher Webhook Diagnostics" }
+    }
+    sendDiscordWebhook(embed)
+end)
+
+end -- end discord card scope block
+
 -- Track the dynamic content size to expand scroll height if items change
 automationTab:GetPropertyChangedSignal("AbsoluteWindowSize"):Connect(function()
-    automationTab.CanvasSize = UDim2.new(0, 0, 0, 1078)
+    automationTab.CanvasSize = UDim2.new(0, 0, 0, 1208)
 end)
 
 
@@ -2145,6 +2261,150 @@ function getBestRaidCards()
     return result
 end
 
+-- Discord Webhook Sender
+function sendDiscordWebhook(embed)
+    local url = Config.DiscordWebhookUrl
+    if not url or url == "" then return end
+    url = url:gsub("%s+", "") -- strip spaces
+    
+    local payload = {
+        username = "ACC Fishing Assistant",
+        avatar_url = "https://i.imgur.com/Wp75uE4.png",
+        embeds = { embed }
+    }
+    
+    local req = syn and syn.request or http and http.request or request
+    if req then
+        task.spawn(function()
+            pcall(req, {
+                Url = url,
+                Method = "POST",
+                Headers = {
+                    ["Content-Type"] = "application/json"
+                },
+                Body = game:GetService("HttpService"):JSONEncode(payload)
+            })
+        end)
+    end
+end
+
+-- Retrieve Travel Merchant Stock
+local function getMerchantStock()
+    local stock = {}
+    pcall(function()
+        local items = ReplicatedData.GetData("MerchantStock") or ReplicatedData.GetData("MerchantItems") or ReplicatedData.GetData("Merchant")
+        if items then
+            for k, v in pairs(items) do
+                if type(v) == "table" then
+                    local name = v.Name or v.Item or tostring(k)
+                    local price = v.Price or v.Cost or 0
+                    table.insert(stock, { Name = name, Price = price })
+                elseif type(v) == "number" then
+                    table.insert(stock, { Name = tostring(k), Price = v })
+                end
+            end
+        end
+    end)
+    
+    if #stock == 0 then
+        pcall(function()
+            local npc = workspace:FindFirstChild("Traveling Merchant") or workspace:FindFirstChild("TravelingMerchant")
+            if npc then
+                for _, desc in ipairs(npc:GetDescendants()) do
+                    if desc:IsA("TextLabel") and desc.Visible and desc.Text ~= "" and not desc.Text:find(":") then
+                        table.insert(stock, { Name = desc.Text, Price = "Unknown" })
+                    end
+                end
+            end
+        end)
+    end
+    
+    return stock
+end
+
+-- Process Catch Webhook
+local function checkAndSendFishWebhook(fullName)
+    if not Config.NotifyRareCatches and not Config.NotifyNewIndex then return end
+    
+    local mutations = {"Gold", "Emerald", "Void", "Diamond", "Rainbow"}
+    local mutation = "None"
+    local cleanName = fullName
+    for _, mut in ipairs(mutations) do
+        if fullName:find(mut) then
+            mutation = mut
+            cleanName = fullName:gsub(mut .. "%s+", "")
+            break
+        end
+    end
+    
+    local isNew = false
+    pcall(function()
+        local pokedex = ReplicatedData.GetData("Pokedex") or ReplicatedData.GetData("FishIndex") or {}
+        if pokedex[cleanName] == nil then
+            isNew = true
+        end
+    end)
+    
+    local severity = {
+        ["None"] = 0,
+        ["Gold"] = 1,
+        ["Emerald"] = 2,
+        ["Void"] = 3,
+        ["Diamond"] = 4,
+        ["Rainbow"] = 5
+    }
+    
+    local userMin = Config.MinMutationNotify or "Rainbow"
+    local hasMetMutation = severity[mutation] >= (severity[userMin] or 5)
+    
+    local isRareFish = false
+    pcall(function()
+        local FishConfig = require(ReplicatedStorage.Modules.Config.Core.FishConfig)
+        local fishData = FishConfig.Fish and FishConfig.Fish[cleanName]
+        if fishData then
+            local multiplier = fishData.Multiplier or fishData.CashMultiplier or 1.0
+            if multiplier >= 5.0 or cleanName == "Giant Whale" or cleanName == "Sea King" then
+                isRareFish = true
+            end
+        end
+    end)
+    
+    local shouldNotify = false
+    local reason = ""
+    if Config.NotifyNewIndex and isNew then
+        shouldNotify = true
+        reason = "🆕 New Discovery!"
+    elseif Config.NotifyRareCatches and (hasMetMutation or isRareFish) then
+        shouldNotify = true
+        reason = mutation ~= "None" and "✨ Mutated Catch!" or "🐋 Rare Catch!"
+    end
+    
+    if shouldNotify then
+        local colorMap = {
+            ["None"] = 5635925,       -- Green (0x55ff55)
+            ["Gold"] = 16766720,      -- Gold (0xffd700)
+            ["Emerald"] = 65407,      -- Emerald (0x00ff7f)
+            ["Void"] = 4915330,       -- Indigo (0x4b0082)
+            ["Diamond"] = 65535,      -- Cyan (0x00ffff)
+            ["Rainbow"] = 16711935    -- Magenta (0xff00ff)
+        }
+        
+        local embed = {
+            title = reason .. " - " .. fullName,
+            description = "Your auto-fisher just reeled in a special catch in ACC!",
+            color = colorMap[mutation] or 16777215,
+            timestamp = DateTime.now():ToISO8601Value(),
+            fields = {
+                { name = "🐟 Fish Name", value = cleanName, inline = true },
+                { name = "✨ Mutation", value = mutation, inline = true },
+                { name = "📈 Session Total", value = tostring(fishCaught) .. " catches", inline = true }
+            },
+            footer = { text = "ACC Auto-Fisher Notification System" }
+        }
+        sendDiscordWebhook(embed)
+    end
+end
+
 -- Get remaining active duration of a cooking buff in seconds
 local function getRecipeRemainingTime(recipeName)
     local remaining = 0
@@ -2341,14 +2601,14 @@ function checkAutoUpgradeRod()
 end
 
 function startAutoCollectTokensLoop()
-    local anyActive = Config.AutoCollectTokens or Config.AutoCollectDragonBalls or Config.AutoWish or Config.AutoRollPets or Config.AutoRaid or Config.AutoVoyage or Config.AutoPetQuests or Config.AutoPackOpener or Config.AutoCook or Config.AutoUpgradeRod
+    local anyActive = Config.AutoCollectTokens or Config.AutoCollectDragonBalls or Config.AutoWish or Config.AutoRollPets or Config.AutoRaid or Config.AutoVoyage or Config.AutoPetQuests or Config.AutoPackOpener or Config.AutoCook or Config.AutoUpgradeRod or Config.NotifyMerchant
     if not anyActive then
         cancelCollectTokensThread()
         return
     end
     if collectTokensThread then return end
     collectTokensThread = task.spawn(function()
-        while Config.AutoCollectTokens or Config.AutoCollectDragonBalls or Config.AutoWish or Config.AutoRollPets or Config.AutoRaid or Config.AutoVoyage or Config.AutoPetQuests or Config.AutoPackOpener or Config.AutoCook or Config.AutoUpgradeRod do
+        while Config.AutoCollectTokens or Config.AutoCollectDragonBalls or Config.AutoWish or Config.AutoRollPets or Config.AutoRaid or Config.AutoVoyage or Config.AutoPetQuests or Config.AutoPackOpener or Config.AutoCook or Config.AutoUpgradeRod or Config.NotifyMerchant do
             -- Collect Map Tokens & Potions
             if Config.AutoCollectTokens then
                 local tag = player.Name .. "Token"
@@ -2761,6 +3021,45 @@ function startAutoCollectTokensLoop()
                     lastRodCheck = now
                     pcall(checkAutoUpgradeRod)
                 end
+            end
+            
+            -- Traveling Merchant Spawn Notifier
+            if Config.NotifyMerchant then
+                pcall(function()
+                    local merchantTime = ReplicatedData.GetData("MerchantTime") or 0
+                    if merchantTime > os.time() then
+                        if lastNotifiedMerchantTime ~= merchantTime then
+                            lastNotifiedMerchantTime = merchantTime
+                            
+                            local stock = getMerchantStock()
+                            local stockListText = ""
+                            if #stock > 0 then
+                                for _, item in ipairs(stock) do
+                                    stockListText = stockListText .. string.format("• **%s** (Cost: %s)\n", item.Name, tostring(item.Price))
+                                end
+                            else
+                                stockListText = "Check in-game to see his rotating stock of Weather Totems, high-value packs, and Potions!"
+                            end
+                            
+                            local minutesLeft = math.floor((merchantTime - os.time()) / 60)
+                            local secondsLeft = (merchantTime - os.time()) % 60
+                            
+                            local embed = {
+                                title = "🎪 Traveling Merchant Spawned!",
+                                description = "A new Traveling Merchant has appeared in the plaza!",
+                                color = 16711850, -- 0xff00aa
+                                timestamp = DateTime.now():ToISO8601Value(),
+                                fields = {
+                                    { name = "⏱️ Time Remaining", value = string.format("%d minutes, %d seconds", minutesLeft, secondsLeft), inline = true },
+                                    { name = "🏷️ Server ID", value = string.format("`%s`", game.JobId), inline = true },
+                                    { name = "📦 Stock Selection", value = stockListText, inline = false }
+                                },
+                                footer = { text = "ACC Auto-Fisher Spawn Alerts" }
+                            }
+                            sendDiscordWebhook(embed)
+                        end
+                    end
+                end)
             end
             
             task.wait(1.0)
@@ -3353,6 +3652,9 @@ function startAutoFish()
         elseif eventType == "FishCaught" or eventType == "FishClaimed" then
             fishCaught = fishCaught + 1
             updateStats()
+            task.spawn(function()
+                pcall(checkAndSendFishWebhook, fishName)
+            end)
             handleCatch(eventType, fishName)
         elseif eventType == "FishEscaped" then
             handleEscape(fishName)
