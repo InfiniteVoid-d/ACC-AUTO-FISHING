@@ -206,7 +206,6 @@ end
 
 -- Load previous settings on startup
 loadSettings()
-task.spawn(checkAndHopMerchant)
 
 -- Periodically autosave settings if they change
 task.spawn(function()
@@ -4498,4 +4497,5 @@ if Config.AutoRelics then
     startAutoRelicsLoop()
 end
 updateBeltSpeedSpoof()
+task.spawn(checkAndHopMerchant)
 print("[Auto Fisher v56] Loaded successfully!")
