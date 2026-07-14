@@ -1858,11 +1858,16 @@ testBtn.MouseButton1Click:Connect(function()
     saveSettings()
     
     local embed = {
-        title = "🧪 Webhook Test Connection Success!",
-        description = "Your Roblox ACC Auto-Fisher is successfully linked to this Discord channel! Hook up your AFK loops and enjoy the notifications, LO.",
-        color = 65280, -- Green
+        title = "🌐 ACC Fishing Assistant - System Diagnostics",
+        description = "A test payload has been successfully dispatched from the Roblox client. Your notification integration is fully functional.",
+        color = 5635925, -- Green
         timestamp = DateTime.now():ToIsoDate(),
-        footer = { text = "ACC Auto-Fisher Webhook Diagnostics" }
+        fields = {
+            { name = "🖥️ Environment", value = "Roblox Client", inline = true },
+            { name = "🏷️ Server Instance", value = string.format("`%s`", game.JobId), inline = true },
+            { name = "✅ Verification", value = "Success", inline = true }
+        },
+        footer = { text = "ACC Webhook Diagnostics System" }
     }
     sendDiscordWebhook(embed)
 end)
@@ -2283,7 +2288,7 @@ function sendDiscordWebhook(embed)
     
     local payload = {
         username = "ACC Fishing Assistant",
-        avatar_url = "https://i.imgur.com/Wp75uE4.png",
+        avatar_url = "https://static.vecteezy.com/system/resources/previews/042/362/181/non_2x/young-man-anime-style-character-illustration-design-manga-anime-boy-black-hair-faces-cartoon-face-young-man-anime-style-character-illustration-design-boy-anime-male-manga-cartoon-free-vector.jpg",
         embeds = { embed }
     }
     
@@ -2478,16 +2483,16 @@ function checkAndHopMerchant()
                     local secondsLeft = (merchantTime - os.time()) % 60
                     
                     local embed = {
-                        title = "🎪 Traveling Merchant Found & Server Hop Stopped!",
-                        description = "A server with an active Traveling Merchant has been found. Server hopping has paused.",
+                        title = "🎪 Plaza Event: Traveling Merchant Located",
+                        description = "An active Traveling Merchant has been successfully located. Server hopping has been suspended.",
                         color = 65280, -- Green
                         timestamp = DateTime.now():ToIsoDate(),
                         fields = {
                             { name = "⏱️ Time Remaining", value = string.format("%d minutes, %d seconds", minutesLeft, secondsLeft), inline = true },
-                            { name = "🏷️ Server ID", value = string.format("`%s`", game.JobId), inline = true },
-                            { name = "📦 Stock Selection", value = stockListText, inline = false }
+                            { name = "🏷️ Server Instance", value = string.format("`%s`", game.JobId), inline = true },
+                            { name = "📦 Stock Inventory", value = stockListText, inline = false }
                         },
-                        footer = { text = "ACC Auto-Fisher Server Hopper" }
+                        footer = { text = "ACC Auto-Fisher Server Hopper System" }
                     }
                     sendDiscordWebhook(embed)
                 end
@@ -2567,17 +2572,25 @@ local function checkAndSendFishWebhook(fullName)
             ["Rainbow"] = 16711935    -- Magenta (0xff00ff)
         }
         
+        local isLegendary = cleanName == "Giant Whale" or cleanName == "Sea King"
+        local embedTitle = isNew and "🆕 Pokedex Update: New Discovery Captured"
+            or (mutation ~= "None" and "✨ Rare Event: Mutation Captured"
+            or (isLegendary and "🐋 Legendary Event: Species Captured" or "🐋 Rare Event: Species Captured"))
+            
+        local embedDesc = isNew and "A brand-new fish species has been registered to your local Pokedex."
+            or "A high-tier fish species has been successfully reeled in."
+
         local embed = {
-            title = reason .. " - " .. fullName,
-            description = "Your auto-fisher just reeled in a special catch in ACC!",
+            title = embedTitle,
+            description = embedDesc,
             color = colorMap[mutation] or 16777215,
             timestamp = DateTime.now():ToIsoDate(),
             fields = {
-                { name = "🐟 Fish Name", value = cleanName, inline = true },
+                { name = "🐟 Species", value = cleanName, inline = true },
                 { name = "✨ Mutation", value = mutation, inline = true },
-                { name = "📈 Session Total", value = tostring(fishCaught) .. " catches", inline = true }
+                { name = "📈 Session Statistics", value = tostring(fishCaught) .. " catches", inline = true }
             },
-            footer = { text = "ACC Auto-Fisher Notification System" }
+            footer = { text = "ACC Auto-Fisher Telemetry Logger" }
         }
         sendDiscordWebhook(embed)
     end
@@ -3223,16 +3236,16 @@ function startAutoCollectTokensLoop()
                             local secondsLeft = (merchantTime - os.time()) % 60
                             
                             local embed = {
-                                title = "🎪 Traveling Merchant Spawned!",
-                                description = "A new Traveling Merchant has appeared in the plaza!",
+                                title = "🎪 Plaza Event: Traveling Merchant Spawned",
+                                description = "A new Traveling Merchant has arrived at the Plaza. He will remain active for 10 minutes.",
                                 color = 16711850, -- 0xff00aa
                                 timestamp = DateTime.now():ToIsoDate(),
                                 fields = {
                                     { name = "⏱️ Time Remaining", value = string.format("%d minutes, %d seconds", minutesLeft, secondsLeft), inline = true },
-                                    { name = "🏷️ Server ID", value = string.format("`%s`", game.JobId), inline = true },
-                                    { name = "📦 Stock Selection", value = stockListText, inline = false }
+                                    { name = "🏷️ Server Instance", value = string.format("`%s`", game.JobId), inline = true },
+                                    { name = "📦 Stock Inventory", value = stockListText, inline = false }
                                 },
-                                footer = { text = "ACC Auto-Fisher Spawn Alerts" }
+                                footer = { text = "ACC Auto-Fisher Spawn Alerts System" }
                             }
                             sendDiscordWebhook(embed)
                         end
