@@ -2288,7 +2288,7 @@ function sendDiscordWebhook(embed)
     
     local payload = {
         username = "ACC Fishing Assistant",
-        avatar_url = "https://static.vecteezy.com/system/resources/previews/042/362/181/non_2x/young-man-anime-style-character-illustration-design-manga-anime-boy-black-hair-faces-cartoon-face-young-man-anime-style-character-illustration-design-boy-anime-male-manga-cartoon-free-vector.jpg",
+        avatar_url = "https://raw.githubusercontent.com/InfiniteVoid-d/ACC-AUTO-FISHING/main/anime_boy_avatar.png",
         embeds = { embed }
     }
     
