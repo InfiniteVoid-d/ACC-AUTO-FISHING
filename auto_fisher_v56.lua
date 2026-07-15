@@ -2009,6 +2009,26 @@ end)
 -- =============================================
 -- CORE FUNCTION DEFINITIONS
 -- =============================================
+local function getHinaSelections()
+    local selections = {}
+    if readfile then
+        local path = "Hina Hub\\Collection\\PlaceSelections_" .. player.Name .. ".json"
+        local success, content = pcall(readfile, path)
+        if success then
+            local HttpService = game:GetService("HttpService")
+            local successJson, data = pcall(HttpService.JSONDecode, HttpService, content)
+            if successJson and data and data.selections then
+                for genre, items in pairs(data.selections) do
+                    for _, item in ipairs(items) do
+                        selections[item] = true
+                    end
+                end
+            end
+        end
+    end
+    return selections
+end
+
 function isPC()
     return UserInputService.KeyboardEnabled and UserInputService.MouseEnabled
 end
@@ -3273,13 +3293,30 @@ function startAutoCollectTokensLoop()
                         local ownedPacks = ReplicatedData.GetData("Packs") or {}
                         local target = Config.AutoPackTarget
                         
+                        -- Load Hina Hub selections if available
+                        local hinaSelections = getHinaSelections()
+                        local hasHinaSelections = false
+                        for _ in pairs(hinaSelections) do
+                            hasHinaSelections = true
+                            break
+                        end
+                        
                         -- Gather all matching packs in inventory
                         local eligiblePacks = {}
                         local totalEligibleCount = 0
                         for pName, amt in pairs(ownedPacks) do
-                            if amt > 0 and (target:lower() == "all" or string.find(pName:lower(), target:lower())) then
-                                table.insert(eligiblePacks, {name = pName, amount = amt})
-                                totalEligibleCount = totalEligibleCount + amt
+                            if amt > 0 then
+                                local isMatch = false
+                                if hasHinaSelections then
+                                    isMatch = hinaSelections[pName] == true
+                                else
+                                    isMatch = target:lower() == "all" or string.find(pName:lower(), target:lower())
+                                end
+                                
+                                if isMatch then
+                                    table.insert(eligiblePacks, {name = pName, amount = amt})
+                                    totalEligibleCount = totalEligibleCount + amt
+                                end
                             end
                         end
                         
