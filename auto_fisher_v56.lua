@@ -4772,7 +4772,14 @@ function sellDuplicates()
             protect = true
         end
 
-        local targetKeep = protect and fishData.amount or 1
+        local targetKeep = 1
+        if protect then
+            targetKeep = fishData.amount
+        elseif hyphenIdx then
+            -- Mutated non-ingredient fish: sell all copies (keep 0) to maximize tokens!
+            targetKeep = 0
+        end
+        
         local sellCount = fishData.amount - targetKeep
         if sellCount > 0 then
             setDebug("Auto-Selling " .. fishData.name .. " x" .. sellCount)
