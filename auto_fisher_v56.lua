@@ -592,7 +592,78 @@ automationTab.CanvasSize = UDim2.new(0, 0, 0, 1110)
 automationTab.Parent = mainPanel
 tabFrames["Automation"] = automationTab
 
--- Helper to create Cards
+local function createDropdown(parent, labelText, position, size, options, defaultVal, callback)
+    local frame = Instance.new("Frame")
+    frame.Size = size
+    frame.Position = position
+    frame.BackgroundTransparency = 1
+    frame.Parent = parent
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -125, 1, 0)
+    label.Position = UDim2.new(0, 8, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = labelText
+    label.TextColor3 = Color3.fromRGB(200, 200, 210)
+    label.TextSize = 10
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Font = Enum.Font.Gotham
+    label.Parent = frame
+    
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 115, 0, 16)
+    btn.Position = UDim2.new(1, -115, 0.5, -8)
+    btn.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Text = defaultVal
+    btn.TextSize = 10
+    btn.Font = Enum.Font.GothamBold
+    btn.Parent = frame
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+    
+    local listFrame = Instance.new("ScrollingFrame")
+    listFrame.Size = UDim2.new(0, 115, 0, 150)
+    listFrame.Position = UDim2.new(1, -115, 0, 20)
+    listFrame.BackgroundColor3 = Color3.fromRGB(24, 24, 28)
+    listFrame.BorderSizePixel = 0
+    listFrame.ScrollBarThickness = 4
+    listFrame.Visible = false
+    listFrame.ZIndex = 50
+    listFrame.Parent = frame
+    Instance.new("UICorner", listFrame).CornerRadius = UDim.new(0, 6)
+    Instance.new("UIStroke", listFrame).Color = Color3.fromRGB(50, 50, 60)
+    
+    local yOffset = 0
+    for _, opt in ipairs(options) do
+        local optBtn = Instance.new("TextButton")
+        optBtn.Size = UDim2.new(1, 0, 0, 20)
+        optBtn.Position = UDim2.new(0, 0, 0, yOffset)
+        optBtn.BackgroundColor3 = Color3.fromRGB(24, 24, 28)
+        optBtn.BorderSizePixel = 0
+        optBtn.Text = opt
+        optBtn.TextColor3 = Color3.fromRGB(200, 200, 210)
+        optBtn.TextSize = 9
+        optBtn.Font = Enum.Font.Gotham
+        optBtn.ZIndex = 51
+        optBtn.Parent = listFrame
+        
+        optBtn.MouseButton1Click:Connect(function()
+            btn.Text = opt
+            listFrame.Visible = false
+            callback(opt)
+        end)
+        
+        yOffset = yOffset + 20
+    end
+    listFrame.CanvasSize = UDim2.new(0, 0, 0, yOffset)
+    
+    btn.MouseButton1Click:Connect(function()
+        listFrame.Visible = not listFrame.Visible
+    end)
+    
+    return frame
+end
+
 local function createCard(parent, titleTextText, size, position)
     local card = Instance.new("Frame")
     card.Size = size
@@ -1420,39 +1491,21 @@ do
         if val then Config.UseWhenPackPlaced = val else whenPlacedInput.Text = tostring(Config.UseWhenPackPlaced) end
     end)
     
-    -- Target Pack Fallback Row
-    local ptRow = Instance.new("Frame")
-    ptRow.Size = UDim2.new(1, -16, 0, 20)
-    ptRow.Position = UDim2.new(0, 0, 0, 130)
-    ptRow.BackgroundTransparency = 1
-    ptRow.Parent = placeCard
+    -- Target Pack Fallback Dropdown
+    local packs = {"Ghoul"}
+    pcall(function()
+        local CardConfig = require(game:GetService("ReplicatedStorage").Modules.Config.Core.CardConfig)
+        local temp = {}
+        for k, v in pairs(CardConfig.Packs) do
+            table.insert(temp, k)
+        end
+        table.sort(temp)
+        if #temp > 0 then packs = temp end
+    end)
     
-    local ptLabel = Instance.new("TextLabel")
-    ptLabel.Size = UDim2.new(1, -105, 1, 0)
-    ptLabel.Position = UDim2.new(0, 8, 0, 0)
-    ptLabel.BackgroundTransparency = 1
-    ptLabel.Text = "🎯 Fallback Target:"
-    ptLabel.TextColor3 = Color3.fromRGB(200, 200, 210)
-    ptLabel.TextSize = 10
-    ptLabel.TextXAlignment = Enum.TextXAlignment.Left
-    ptLabel.Font = Enum.Font.Gotham
-    ptLabel.Parent = ptRow
-    
-    local ptInput = Instance.new("TextBox")
-    ptInput.Size = UDim2.new(0, 95, 0, 16)
-    ptInput.Position = UDim2.new(1, -95, 0.5, -8)
-    ptInput.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
-    ptInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-    ptInput.Text = Config.AutoPackTarget
-    ptInput.PlaceholderText = "e.g. Ghoul"
-    ptInput.TextSize = 10
-    ptInput.Font = Enum.Font.GothamBold
-    ptInput.ClearTextOnFocus = false
-    ptInput.Parent = ptRow
-    Instance.new("UICorner", ptInput).CornerRadius = UDim.new(0, 4)
-    
-    ptInput.FocusLost:Connect(function()
-        if ptInput.Text ~= "" then Config.AutoPackTarget = ptInput.Text end
+    local dropdownFrame = createDropdown(placeCard, "🎯 Fallback Target:", UDim2.new(0, 0, 0, 130), UDim2.new(1, -16, 0, 20), packs, Config.AutoPackTarget, function(val)
+        Config.AutoPackTarget = val
+        setDebug("Fallback pack target set to: " .. val)
     end)
 
     -- Card 2: AUTO HATCH TIME CONTROL
@@ -1657,39 +1710,29 @@ do
     -- Card 4: PLACE PACK PRIORITY
     local priorityCard = createCard(packTab, "PLACE PACK PRIORITY", UDim2.new(1, 0, 0, 220), UDim2.new(0, 0, 0, 450))
     
+    local packsList = {"None"}
+    pcall(function()
+        local CardConfig = require(game:GetService("ReplicatedStorage").Modules.Config.Core.CardConfig)
+        local temp = {}
+        for k, v in pairs(CardConfig.Packs) do
+            table.insert(temp, k)
+        end
+        table.sort(temp)
+        for _, name in ipairs(temp) do
+            table.insert(packsList, name)
+        end
+    end)
+    
     for slotIdx = 1, 7 do
-        local slotRow = Instance.new("Frame")
-        slotRow.Size = UDim2.new(1, -16, 0, 20)
-        slotRow.Position = UDim2.new(0, 0, 0, 20 + (slotIdx - 1) * 22)
-        slotRow.BackgroundTransparency = 1
-        slotRow.Parent = priorityCard
+        local slotVal = Config.PrioritySlots[slotIdx] or ""
+        if slotVal == "" then slotVal = "None" end
         
-        local sLabel = Instance.new("TextLabel")
-        sLabel.Size = UDim2.new(1, -125, 1, 0)
-        sLabel.Position = UDim2.new(0, 8, 0, 0)
-        sLabel.BackgroundTransparency = 1
-        sLabel.Text = string.format("Priority %d:", slotIdx)
-        sLabel.TextColor3 = Color3.fromRGB(200, 200, 210)
-        sLabel.TextSize = 10
-        sLabel.TextXAlignment = Enum.TextXAlignment.Left
-        sLabel.Font = Enum.Font.Gotham
-        sLabel.Parent = slotRow
-        
-        local sInput = Instance.new("TextBox")
-        sInput.Size = UDim2.new(0, 115, 0, 16)
-        sInput.Position = UDim2.new(1, -115, 0.5, -8)
-        sInput.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
-        sInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-        sInput.Text = Config.PrioritySlots[slotIdx] or ""
-        sInput.PlaceholderText = "e.g. Spy-Gold-Bundle"
-        sInput.TextSize = 9
-        sInput.Font = Enum.Font.GothamBold
-        sInput.ClearTextOnFocus = false
-        sInput.Parent = slotRow
-        Instance.new("UICorner", sInput).CornerRadius = UDim.new(0, 4)
-        
-        sInput.FocusLost:Connect(function()
-            Config.PrioritySlots[slotIdx] = sInput.Text
+        local dropdownFrame = createDropdown(priorityCard, string.format("⭐ Priority %d:", slotIdx), UDim2.new(0, 0, 0, 20 + (slotIdx - 1) * 22), UDim2.new(1, -16, 0, 20), packsList, slotVal, function(val)
+            if val == "None" then
+                Config.PrioritySlots[slotIdx] = ""
+            else
+                Config.PrioritySlots[slotIdx] = val
+            end
         end)
     end
 end
@@ -3534,13 +3577,16 @@ function startAutoCollectTokensLoop()
                             local eligiblePacks = {}
                             local totalEligibleCount = 0
                             
+                            local matchedPacks = {}
                             -- Search by Priority Slots (Slot 1 to 7)
                             for _, priorityName in ipairs(Config.PrioritySlots) do
                                 if priorityName and priorityName ~= "" then
-                                    local amt = ownedPacks[priorityName] or 0
-                                    if amt > 0 then
-                                        table.insert(eligiblePacks, {name = priorityName, amount = amt})
-                                        totalEligibleCount = totalEligibleCount + amt
+                                    for pName, amt in pairs(ownedPacks) do
+                                        if amt > 0 and not matchedPacks[pName] and string.find(pName:lower(), priorityName:lower()) then
+                                            matchedPacks[pName] = true
+                                            table.insert(eligiblePacks, {name = pName, amount = amt})
+                                            totalEligibleCount = totalEligibleCount + amt
+                                        end
                                     end
                                 end
                             end
