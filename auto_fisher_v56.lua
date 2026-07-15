@@ -2528,8 +2528,8 @@ local upToggle = nil
 local downToggle = nil
 
 local function updateTogglesForActiveFish()
-    if upToggle then upToggle:Destroy() end
-    if downToggle then downToggle:Destroy() end
+    if upToggle and upToggle.Parent then upToggle.Parent:Destroy() end
+    if downToggle and downToggle.Parent then downToggle.Parent:Destroy() end
     
     local upVal = Config.SelectedUpgradeFish[activeFish] == true
     local downVal = Config.SelectedDowngradeFish[activeFish] == true
