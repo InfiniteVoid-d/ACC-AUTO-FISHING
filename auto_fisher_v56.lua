@@ -110,12 +110,21 @@ Config = {
     AutoPetQuests = false,
     
     -- Auto Pack Opener settings
-    AutoPackOpener = false,
-    AutoPackTarget = "Ghoul",
-    AutoPackLimit = 72,
-    UsePotionThreshold = 70,
+    AutoPlacePacks = false,
+    TPPlace = true,
+    PlaceLimit = 72,
+    UseWhenPackPlaced = 70,
+    AutoOpenPacks = false,
+    TPCollect = true,
+    NumReadyToOpen = 1,
+    AutoUseHatchTime = false,
     HatchTime1MaxUses = 47,
-    AutoApplyHatchPotions = false,
+    HatchTime2MaxUses = 0,
+    HatchTime3MaxUses = 0,
+    StopAtReadyCount = 1,
+    SyncHinaHub = true,
+    PrioritySlots = {"", "", "", "", "", "", ""},
+    AutoPackTarget = "Ghoul",
     
     -- Auto Cook & Rod Settings
     AutoCook = false,
@@ -567,7 +576,7 @@ packTab.Position = UDim2.new(0, 10, 0, 10)
 packTab.BackgroundTransparency = 1
 packTab.BorderSizePixel = 0
 packTab.ScrollBarThickness = 4
-packTab.CanvasSize = UDim2.new(0, 0, 0, 400)
+packTab.CanvasSize = UDim2.new(0, 0, 0, 680)
 packTab.Visible = false
 packTab.Parent = mainPanel
 tabFrames["Packs/Bundles"] = packTab
@@ -1319,183 +1328,371 @@ createGridToggle(petEggCard, "🐾 Auto Pet Quests", UDim2.new(0, 0, 0, 94), UDi
 end)
 
 -- =============================================
--- AUTO PACK OPENER CARD (Y = 0, Height 200)
+-- NEW PACKS & BUNDLES TAB CARDS
 -- =============================================
-local packOpenerCard = createCard(packTab, "AUTO PACK OPENER", UDim2.new(1, 0, 0, 200), UDim2.new(0, 0, 0, 0))
+do
+    -- Card 1: PACK PLACEMENT AUTOMATION
+    local placeCard = createCard(packTab, "PACK PLACEMENT AUTOMATION", UDim2.new(1, 0, 0, 175), UDim2.new(0, 0, 0, 0))
+    
+    createGridToggle(placeCard, "📦 Auto Place Packs", UDim2.new(0, 0, 0, 20), UDim2.new(1, 0, 0, 18), Config.AutoPlacePacks, function(val)
+        Config.AutoPlacePacks = val
+        if autoFishing then startAutoCollectTokensLoop() end
+    end)
+    
+    createGridToggle(placeCard, "⚡ TP Place (Faster)", UDim2.new(0, 0, 0, 42), UDim2.new(1, 0, 0, 18), Config.TPPlace, function(val)
+        Config.TPPlace = val
+    end)
+    
+    -- Sync Hina Hub selections
+    createGridToggle(placeCard, "🔄 Sync Hina Hub Selections", UDim2.new(0, 0, 0, 64), UDim2.new(1, 0, 0, 18), Config.SyncHinaHub, function(val)
+        Config.SyncHinaHub = val
+    end)
+    
+    -- Place Limit Row
+    local limitRow = Instance.new("Frame")
+    limitRow.Size = UDim2.new(1, -16, 0, 20)
+    limitRow.Position = UDim2.new(0, 0, 0, 86)
+    limitRow.BackgroundTransparency = 1
+    limitRow.Parent = placeCard
+    
+    local limLabel = Instance.new("TextLabel")
+    limLabel.Size = UDim2.new(1, -105, 1, 0)
+    limLabel.Position = UDim2.new(0, 8, 0, 0)
+    limLabel.BackgroundTransparency = 1
+    limLabel.Text = "🚪 Place Limit:"
+    limLabel.TextColor3 = Color3.fromRGB(200, 200, 210)
+    limLabel.TextSize = 10
+    limLabel.TextXAlignment = Enum.TextXAlignment.Left
+    limLabel.Font = Enum.Font.Gotham
+    limLabel.Parent = limitRow
+    
+    local limitInput = Instance.new("TextBox")
+    limitInput.Size = UDim2.new(0, 95, 0, 16)
+    limitInput.Position = UDim2.new(1, -95, 0.5, -8)
+    limitInput.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+    limitInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+    limitInput.Text = tostring(Config.PlaceLimit)
+    limitInput.PlaceholderText = "e.g. 72"
+    limitInput.TextSize = 10
+    limitInput.Font = Enum.Font.GothamBold
+    limitInput.ClearTextOnFocus = false
+    limitInput.Parent = limitRow
+    Instance.new("UICorner", limitInput).CornerRadius = UDim.new(0, 4)
+    
+    limitInput.FocusLost:Connect(function()
+        local val = tonumber(limitInput.Text)
+        if val then Config.PlaceLimit = val else limitInput.Text = tostring(Config.PlaceLimit) end
+    end)
+    
+    -- Use when Placed Row
+    local whenPlacedRow = Instance.new("Frame")
+    whenPlacedRow.Size = UDim2.new(1, -16, 0, 20)
+    whenPlacedRow.Position = UDim2.new(0, 0, 0, 108)
+    whenPlacedRow.BackgroundTransparency = 1
+    whenPlacedRow.Parent = placeCard
+    
+    local wpLabel = Instance.new("TextLabel")
+    wpLabel.Size = UDim2.new(1, -105, 1, 0)
+    wpLabel.Position = UDim2.new(0, 8, 0, 0)
+    wpLabel.BackgroundTransparency = 1
+    wpLabel.Text = "🧪 Use When # Placed:"
+    wpLabel.TextColor3 = Color3.fromRGB(200, 200, 210)
+    wpLabel.TextSize = 10
+    wpLabel.TextXAlignment = Enum.TextXAlignment.Left
+    wpLabel.Font = Enum.Font.Gotham
+    wpLabel.Parent = whenPlacedRow
+    
+    local whenPlacedInput = Instance.new("TextBox")
+    whenPlacedInput.Size = UDim2.new(0, 95, 0, 16)
+    whenPlacedInput.Position = UDim2.new(1, -95, 0.5, -8)
+    whenPlacedInput.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+    whenPlacedInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+    whenPlacedInput.Text = tostring(Config.UseWhenPackPlaced)
+    whenPlacedInput.PlaceholderText = "e.g. 70"
+    whenPlacedInput.TextSize = 10
+    whenPlacedInput.Font = Enum.Font.GothamBold
+    whenPlacedInput.ClearTextOnFocus = false
+    whenPlacedInput.Parent = whenPlacedRow
+    Instance.new("UICorner", whenPlacedInput).CornerRadius = UDim.new(0, 4)
+    
+    whenPlacedInput.FocusLost:Connect(function()
+        local val = tonumber(whenPlacedInput.Text)
+        if val then Config.UseWhenPackPlaced = val else whenPlacedInput.Text = tostring(Config.UseWhenPackPlaced) end
+    end)
+    
+    -- Target Pack Fallback Row
+    local ptRow = Instance.new("Frame")
+    ptRow.Size = UDim2.new(1, -16, 0, 20)
+    ptRow.Position = UDim2.new(0, 0, 0, 130)
+    ptRow.BackgroundTransparency = 1
+    ptRow.Parent = placeCard
+    
+    local ptLabel = Instance.new("TextLabel")
+    ptLabel.Size = UDim2.new(1, -105, 1, 0)
+    ptLabel.Position = UDim2.new(0, 8, 0, 0)
+    ptLabel.BackgroundTransparency = 1
+    ptLabel.Text = "🎯 Fallback Target:"
+    ptLabel.TextColor3 = Color3.fromRGB(200, 200, 210)
+    ptLabel.TextSize = 10
+    ptLabel.TextXAlignment = Enum.TextXAlignment.Left
+    ptLabel.Font = Enum.Font.Gotham
+    ptLabel.Parent = ptRow
+    
+    local ptInput = Instance.new("TextBox")
+    ptInput.Size = UDim2.new(0, 95, 0, 16)
+    ptInput.Position = UDim2.new(1, -95, 0.5, -8)
+    ptInput.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+    ptInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ptInput.Text = Config.AutoPackTarget
+    ptInput.PlaceholderText = "e.g. Ghoul"
+    ptInput.TextSize = 10
+    ptInput.Font = Enum.Font.GothamBold
+    ptInput.ClearTextOnFocus = false
+    ptInput.Parent = ptRow
+    Instance.new("UICorner", ptInput).CornerRadius = UDim.new(0, 4)
+    
+    ptInput.FocusLost:Connect(function()
+        if ptInput.Text ~= "" then Config.AutoPackTarget = ptInput.Text end
+    end)
 
-createGridToggle(packOpenerCard, "📦 Auto Place/Open Packs", UDim2.new(0, 0, 0, 20), UDim2.new(1, 0, 0, 18), Config.AutoPackOpener, function(val)
-    Config.AutoPackOpener = val
-    if autoFishing then
-        startAutoCollectTokensLoop()
+    -- Card 2: AUTO HATCH TIME CONTROL
+    local hatchCard = createCard(packTab, "AUTO HATCH TIME CONTROL", UDim2.new(1, 0, 0, 155), UDim2.new(0, 0, 0, 180))
+    
+    createGridToggle(hatchCard, "🧪 Auto Use Hatch Time", UDim2.new(0, 0, 0, 20), UDim2.new(1, 0, 0, 18), Config.AutoUseHatchTime, function(val)
+        Config.AutoUseHatchTime = val
+    end)
+    
+    -- Hatch Time I Max uses Row
+    local ht1Row = Instance.new("Frame")
+    ht1Row.Size = UDim2.new(1, -16, 0, 20)
+    ht1Row.Position = UDim2.new(0, 0, 0, 42)
+    ht1Row.BackgroundTransparency = 1
+    ht1Row.Parent = hatchCard
+    
+    local ht1Label = Instance.new("TextLabel")
+    ht1Label.Size = UDim2.new(1, -105, 1, 0)
+    ht1Label.Position = UDim2.new(0, 8, 0, 0)
+    ht1Label.BackgroundTransparency = 1
+    ht1Label.Text = "⚡ Hatch Time I Max Uses:"
+    ht1Label.TextColor3 = Color3.fromRGB(200, 200, 210)
+    ht1Label.TextSize = 10
+    ht1Label.TextXAlignment = Enum.TextXAlignment.Left
+    ht1Label.Font = Enum.Font.Gotham
+    ht1Label.Parent = ht1Row
+    
+    local ht1Input = Instance.new("TextBox")
+    ht1Input.Size = UDim2.new(0, 95, 0, 16)
+    ht1Input.Position = UDim2.new(1, -95, 0.5, -8)
+    ht1Input.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+    ht1Input.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ht1Input.Text = tostring(Config.HatchTime1MaxUses)
+    ht1Input.PlaceholderText = "e.g. 47"
+    ht1Input.TextSize = 10
+    ht1Input.Font = Enum.Font.GothamBold
+    ht1Input.ClearTextOnFocus = false
+    ht1Input.Parent = ht1Row
+    Instance.new("UICorner", ht1Input).CornerRadius = UDim.new(0, 4)
+    
+    ht1Input.FocusLost:Connect(function()
+        local val = tonumber(ht1Input.Text)
+        if val then Config.HatchTime1MaxUses = val else ht1Input.Text = tostring(Config.HatchTime1MaxUses) end
+    end)
+    
+    -- Hatch Time II Max uses Row
+    local ht2Row = Instance.new("Frame")
+    ht2Row.Size = UDim2.new(1, -16, 0, 20)
+    ht2Row.Position = UDim2.new(0, 0, 0, 64)
+    ht2Row.BackgroundTransparency = 1
+    ht2Row.Parent = hatchCard
+    
+    local ht2Label = Instance.new("TextLabel")
+    ht2Label.Size = UDim2.new(1, -105, 1, 0)
+    ht2Label.Position = UDim2.new(0, 8, 0, 0)
+    ht2Label.BackgroundTransparency = 1
+    ht2Label.Text = "⚡ Hatch Time II Max Uses:"
+    ht2Label.TextColor3 = Color3.fromRGB(200, 200, 210)
+    ht2Label.TextSize = 10
+    ht2Label.TextXAlignment = Enum.TextXAlignment.Left
+    ht2Label.Font = Enum.Font.Gotham
+    ht2Label.Parent = ht2Row
+    
+    local ht2Input = Instance.new("TextBox")
+    ht2Input.Size = UDim2.new(0, 95, 0, 16)
+    ht2Input.Position = UDim2.new(1, -95, 0.5, -8)
+    ht2Input.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+    ht2Input.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ht2Input.Text = tostring(Config.HatchTime2MaxUses)
+    ht2Input.PlaceholderText = "e.g. 0"
+    ht2Input.TextSize = 10
+    ht2Input.Font = Enum.Font.GothamBold
+    ht2Input.ClearTextOnFocus = false
+    ht2Input.Parent = ht2Row
+    Instance.new("UICorner", ht2Input).CornerRadius = UDim.new(0, 4)
+    
+    ht2Input.FocusLost:Connect(function()
+        local val = tonumber(ht2Input.Text)
+        if val then Config.HatchTime2MaxUses = val else ht2Input.Text = tostring(Config.HatchTime2MaxUses) end
+    end)
+    
+    -- Hatch Time III Max uses Row
+    local ht3Row = Instance.new("Frame")
+    ht3Row.Size = UDim2.new(1, -16, 0, 20)
+    ht3Row.Position = UDim2.new(0, 0, 0, 86)
+    ht3Row.BackgroundTransparency = 1
+    ht3Row.Parent = hatchCard
+    
+    local ht3Label = Instance.new("TextLabel")
+    ht3Label.Size = UDim2.new(1, -105, 1, 0)
+    ht3Label.Position = UDim2.new(0, 8, 0, 0)
+    ht3Label.BackgroundTransparency = 1
+    ht3Label.Text = "⚡ Hatch Time III Max Uses:"
+    ht3Label.TextColor3 = Color3.fromRGB(200, 200, 210)
+    ht3Label.TextSize = 10
+    ht3Label.TextXAlignment = Enum.TextXAlignment.Left
+    ht3Label.Font = Enum.Font.Gotham
+    ht3Label.Parent = ht3Row
+    
+    local ht3Input = Instance.new("TextBox")
+    ht3Input.Size = UDim2.new(0, 95, 0, 16)
+    ht3Input.Position = UDim2.new(1, -95, 0.5, -8)
+    ht3Input.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+    ht3Input.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ht3Input.Text = tostring(Config.HatchTime3MaxUses)
+    ht3Input.PlaceholderText = "e.g. 0"
+    ht3Input.TextSize = 10
+    ht3Input.Font = Enum.Font.GothamBold
+    ht3Input.ClearTextOnFocus = false
+    ht3Input.Parent = ht3Row
+    Instance.new("UICorner", ht3Input).CornerRadius = UDim.new(0, 4)
+    
+    ht3Input.FocusLost:Connect(function()
+        local val = tonumber(ht3Input.Text)
+        if val then Config.HatchTime3MaxUses = val else ht3Input.Text = tostring(Config.HatchTime3MaxUses) end
+    end)
+    
+    -- Stop at # Ready Row
+    local stopReadyRow = Instance.new("Frame")
+    stopReadyRow.Size = UDim2.new(1, -16, 0, 20)
+    stopReadyRow.Position = UDim2.new(0, 0, 0, 108)
+    stopReadyRow.BackgroundTransparency = 1
+    stopReadyRow.Parent = hatchCard
+    
+    local srLabel = Instance.new("TextLabel")
+    srLabel.Size = UDim2.new(1, -105, 1, 0)
+    srLabel.Position = UDim2.new(0, 8, 0, 0)
+    srLabel.BackgroundTransparency = 1
+    srLabel.Text = "🛑 Stop at # of Ready! Pack:"
+    srLabel.TextColor3 = Color3.fromRGB(200, 200, 210)
+    srLabel.TextSize = 10
+    srLabel.TextXAlignment = Enum.TextXAlignment.Left
+    srLabel.Font = Enum.Font.Gotham
+    srLabel.Parent = stopReadyRow
+    
+    local stopReadyInput = Instance.new("TextBox")
+    stopReadyInput.Size = UDim2.new(0, 95, 0, 16)
+    stopReadyInput.Position = UDim2.new(1, -95, 0.5, -8)
+    stopReadyInput.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+    stopReadyInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+    stopReadyInput.Text = tostring(Config.StopAtReadyCount)
+    stopReadyInput.PlaceholderText = "e.g. 1"
+    stopReadyInput.TextSize = 10
+    stopReadyInput.Font = Enum.Font.GothamBold
+    stopReadyInput.ClearTextOnFocus = false
+    stopReadyInput.Parent = stopReadyRow
+    Instance.new("UICorner", stopReadyInput).CornerRadius = UDim.new(0, 4)
+    
+    stopReadyInput.FocusLost:Connect(function()
+        local val = tonumber(stopReadyInput.Text)
+        if val then Config.StopAtReadyCount = val else stopReadyInput.Text = tostring(Config.StopAtReadyCount) end
+    end)
+
+    -- Card 3: PACK OPENING AUTOMATION
+    local openCard = createCard(packTab, "PACK OPENING AUTOMATION", UDim2.new(1, 0, 0, 105), UDim2.new(0, 0, 0, 340))
+    
+    createGridToggle(openCard, "📂 Auto Open Packs", UDim2.new(0, 0, 0, 20), UDim2.new(1, 0, 0, 18), Config.AutoOpenPacks, function(val)
+        Config.AutoOpenPacks = val
+        if autoFishing then startAutoCollectTokensLoop() end
+    end)
+    
+    createGridToggle(openCard, "⚡ TP Collect (Faster)", UDim2.new(0, 0, 0, 42), UDim2.new(1, 0, 0, 18), Config.TPCollect, function(val)
+        Config.TPCollect = val
+    end)
+    
+    -- # of Ready! Pack Row
+    local readyRow = Instance.new("Frame")
+    readyRow.Size = UDim2.new(1, -16, 0, 20)
+    readyRow.Position = UDim2.new(0, 0, 0, 64)
+    readyRow.BackgroundTransparency = 1
+    readyRow.Parent = openCard
+    
+    local rLabel = Instance.new("TextLabel")
+    rLabel.Size = UDim2.new(1, -105, 1, 0)
+    rLabel.Position = UDim2.new(0, 8, 0, 0)
+    rLabel.BackgroundTransparency = 1
+    rLabel.Text = "📋 # of Ready! Pack to Open:"
+    rLabel.TextColor3 = Color3.fromRGB(200, 200, 210)
+    rLabel.TextSize = 10
+    rLabel.TextXAlignment = Enum.TextXAlignment.Left
+    rLabel.Font = Enum.Font.Gotham
+    rLabel.Parent = readyRow
+    
+    local readyInput = Instance.new("TextBox")
+    readyInput.Size = UDim2.new(0, 95, 0, 16)
+    readyInput.Position = UDim2.new(1, -95, 0.5, -8)
+    readyInput.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+    readyInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+    readyInput.Text = tostring(Config.NumReadyToOpen)
+    readyInput.PlaceholderText = "e.g. 1"
+    readyInput.TextSize = 10
+    readyInput.Font = Enum.Font.GothamBold
+    readyInput.ClearTextOnFocus = false
+    readyInput.Parent = readyRow
+    Instance.new("UICorner", readyInput).CornerRadius = UDim.new(0, 4)
+    
+    readyInput.FocusLost:Connect(function()
+        local val = tonumber(readyInput.Text)
+        if val then Config.NumReadyToOpen = val else readyInput.Text = tostring(Config.NumReadyToOpen) end
+    end)
+
+    -- Card 4: PLACE PACK PRIORITY
+    local priorityCard = createCard(packTab, "PLACE PACK PRIORITY", UDim2.new(1, 0, 0, 220), UDim2.new(0, 0, 0, 450))
+    
+    for slotIdx = 1, 7 do
+        local slotRow = Instance.new("Frame")
+        slotRow.Size = UDim2.new(1, -16, 0, 20)
+        slotRow.Position = UDim2.new(0, 0, 0, 20 + (slotIdx - 1) * 22)
+        slotRow.BackgroundTransparency = 1
+        slotRow.Parent = priorityCard
+        
+        local sLabel = Instance.new("TextLabel")
+        sLabel.Size = UDim2.new(1, -125, 1, 0)
+        sLabel.Position = UDim2.new(0, 8, 0, 0)
+        sLabel.BackgroundTransparency = 1
+        sLabel.Text = string.format("Priority %d:", slotIdx)
+        sLabel.TextColor3 = Color3.fromRGB(200, 200, 210)
+        sLabel.TextSize = 10
+        sLabel.TextXAlignment = Enum.TextXAlignment.Left
+        sLabel.Font = Enum.Font.Gotham
+        sLabel.Parent = slotRow
+        
+        local sInput = Instance.new("TextBox")
+        sInput.Size = UDim2.new(0, 115, 0, 16)
+        sInput.Position = UDim2.new(1, -115, 0.5, -8)
+        sInput.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+        sInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+        sInput.Text = Config.PrioritySlots[slotIdx] or ""
+        sInput.PlaceholderText = "e.g. Spy-Gold-Bundle"
+        sInput.TextSize = 9
+        sInput.Font = Enum.Font.GothamBold
+        sInput.ClearTextOnFocus = false
+        sInput.Parent = slotRow
+        Instance.new("UICorner", sInput).CornerRadius = UDim.new(0, 4)
+        
+        sInput.FocusLost:Connect(function()
+            Config.PrioritySlots[slotIdx] = sInput.Text
+        end)
     end
-end)
-
--- Target Pack Name Row
-local packTargetRow = Instance.new("Frame")
-packTargetRow.Size = UDim2.new(1, -16, 0, 20)
-packTargetRow.Position = UDim2.new(0, 0, 0, 42)
-packTargetRow.BackgroundTransparency = 1
-packTargetRow.Parent = packOpenerCard
-
-local ptLabel = Instance.new("TextLabel")
-ptLabel.Size = UDim2.new(1, -105, 1, 0)
-ptLabel.Position = UDim2.new(0, 8, 0, 0)
-ptLabel.BackgroundTransparency = 1
-ptLabel.Text = "🎯 Target Pack:"
-ptLabel.TextColor3 = Color3.fromRGB(200, 200, 210)
-ptLabel.TextSize = 10
-ptLabel.TextXAlignment = Enum.TextXAlignment.Left
-ptLabel.Font = Enum.Font.Gotham
-ptLabel.Parent = packTargetRow
-
-local packTargetInputBox = Instance.new("TextBox")
-packTargetInputBox.Size = UDim2.new(0, 95, 0, 16)
-packTargetInputBox.Position = UDim2.new(1, -95, 0.5, -8)
-packTargetInputBox.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
-packTargetInputBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-packTargetInputBox.Text = Config.AutoPackTarget
-packTargetInputBox.PlaceholderText = "e.g. Ghoul"
-packTargetInputBox.TextSize = 10
-packTargetInputBox.Font = Enum.Font.GothamBold
-packTargetInputBox.ClearTextOnFocus = false
-packTargetInputBox.Parent = packTargetRow
-Instance.new("UICorner", packTargetInputBox).CornerRadius = UDim.new(0, 4)
-
-packTargetInputBox.FocusLost:Connect(function(enterPressed)
-    if packTargetInputBox.Text ~= "" then
-        Config.AutoPackTarget = packTargetInputBox.Text
-        setDebug("Pack target set to: " .. Config.AutoPackTarget)
-    else
-        packTargetInputBox.Text = Config.AutoPackTarget
-    end
-end)
-
-createGridToggle(packOpenerCard, "🧪 Auto Apply Potions", UDim2.new(0, 0, 0, 68), UDim2.new(1, 0, 0, 18), Config.AutoApplyHatchPotions, function(val)
-    Config.AutoApplyHatchPotions = val
-end)
-
--- Place Limit Row
-local placeLimitRow = Instance.new("Frame")
-placeLimitRow.Size = UDim2.new(1, -16, 0, 20)
-placeLimitRow.Position = UDim2.new(0, 0, 0, 90)
-placeLimitRow.BackgroundTransparency = 1
-placeLimitRow.Parent = packOpenerCard
-
-local plLabel = Instance.new("TextLabel")
-plLabel.Size = UDim2.new(1, -105, 1, 0)
-plLabel.Position = UDim2.new(0, 8, 0, 0)
-plLabel.BackgroundTransparency = 1
-plLabel.Text = "🚪 Place Limit:"
-plLabel.TextColor3 = Color3.fromRGB(200, 200, 210)
-plLabel.TextSize = 10
-plLabel.TextXAlignment = Enum.TextXAlignment.Left
-plLabel.Font = Enum.Font.Gotham
-plLabel.Parent = placeLimitRow
-
-local placeLimitInput = Instance.new("TextBox")
-placeLimitInput.Size = UDim2.new(0, 95, 0, 16)
-placeLimitInput.Position = UDim2.new(1, -95, 0.5, -8)
-placeLimitInput.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
-placeLimitInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-placeLimitInput.Text = tostring(Config.AutoPackLimit)
-placeLimitInput.PlaceholderText = "e.g. 72"
-placeLimitInput.TextSize = 10
-placeLimitInput.Font = Enum.Font.GothamBold
-placeLimitInput.ClearTextOnFocus = false
-placeLimitInput.Parent = placeLimitRow
-Instance.new("UICorner", placeLimitInput).CornerRadius = UDim.new(0, 4)
-
-placeLimitInput.FocusLost:Connect(function(enterPressed)
-    local val = tonumber(placeLimitInput.Text)
-    if val then
-        Config.AutoPackLimit = val
-        setDebug("Place limit set to: " .. val)
-    else
-        placeLimitInput.Text = tostring(Config.AutoPackLimit)
-    end
-end)
-
--- Potion Use Threshold Row
-local thresholdRow = Instance.new("Frame")
-thresholdRow.Size = UDim2.new(1, -16, 0, 20)
-thresholdRow.Position = UDim2.new(0, 0, 0, 112)
-thresholdRow.BackgroundTransparency = 1
-thresholdRow.Parent = packOpenerCard
-
-local thLabel = Instance.new("TextLabel")
-thLabel.Size = UDim2.new(1, -105, 1, 0)
-thLabel.Position = UDim2.new(0, 8, 0, 0)
-thLabel.BackgroundTransparency = 1
-thLabel.Text = "🧪 Potion Threshold:"
-thLabel.TextColor3 = Color3.fromRGB(200, 200, 210)
-thLabel.TextSize = 10
-thLabel.TextXAlignment = Enum.TextXAlignment.Left
-thLabel.Font = Enum.Font.Gotham
-thLabel.Parent = thresholdRow
-
-local thresholdInput = Instance.new("TextBox")
-thresholdInput.Size = UDim2.new(0, 95, 0, 16)
-thresholdInput.Position = UDim2.new(1, -95, 0.5, -8)
-thresholdInput.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
-thresholdInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-thresholdInput.Text = tostring(Config.UsePotionThreshold)
-thresholdInput.PlaceholderText = "e.g. 70"
-thresholdInput.TextSize = 10
-thresholdInput.Font = Enum.Font.GothamBold
-thresholdInput.ClearTextOnFocus = false
-thresholdInput.Parent = thresholdRow
-Instance.new("UICorner", thresholdInput).CornerRadius = UDim.new(0, 4)
-
-thresholdInput.FocusLost:Connect(function(enterPressed)
-    local val = tonumber(thresholdInput.Text)
-    if val then
-        Config.UsePotionThreshold = val
-        setDebug("Potion threshold set to: " .. val)
-    else
-        thresholdInput.Text = tostring(Config.UsePotionThreshold)
-    end
-end)
-
--- Max Potion Uses Row
-local maxUsesRow = Instance.new("Frame")
-maxUsesRow.Size = UDim2.new(1, -16, 0, 20)
-maxUsesRow.Position = UDim2.new(0, 0, 0, 134)
-maxUsesRow.BackgroundTransparency = 1
-maxUsesRow.Parent = packOpenerCard
-
-local muLabel = Instance.new("TextLabel")
-muLabel.Size = UDim2.new(1, -105, 1, 0)
-muLabel.Position = UDim2.new(0, 8, 0, 0)
-muLabel.BackgroundTransparency = 1
-muLabel.Text = "⚡ Max Potions Per Batch:"
-muLabel.TextColor3 = Color3.fromRGB(200, 200, 210)
-muLabel.TextSize = 10
-muLabel.TextXAlignment = Enum.TextXAlignment.Left
-muLabel.Font = Enum.Font.Gotham
-muLabel.Parent = maxUsesRow
-
-local maxUsesInput = Instance.new("TextBox")
-maxUsesInput.Size = UDim2.new(0, 95, 0, 16)
-maxUsesInput.Position = UDim2.new(1, -95, 0.5, -8)
-maxUsesInput.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
-maxUsesInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-maxUsesInput.Text = tostring(Config.HatchTime1MaxUses)
-maxUsesInput.PlaceholderText = "e.g. 47"
-maxUsesInput.TextSize = 10
-maxUsesInput.Font = Enum.Font.GothamBold
-maxUsesInput.ClearTextOnFocus = false
-maxUsesInput.Parent = maxUsesRow
-Instance.new("UICorner", maxUsesInput).CornerRadius = UDim.new(0, 4)
-
-maxUsesInput.FocusLost:Connect(function(enterPressed)
-    local val = tonumber(maxUsesInput.Text)
-    if val then
-        Config.HatchTime1MaxUses = val
-        setDebug("Max potion uses set to: " .. val)
-    else
-        maxUsesInput.Text = tostring(Config.HatchTime1MaxUses)
-    end
-end)
+end
 
 -- =============================================
 -- COOKING & ROD AUTOMATION CARD (Y = 463, Height 95)
@@ -2039,6 +2236,20 @@ local function getHinaSelections()
         end
     end
     return selections
+end
+
+local function walkTo(targetPosition)
+    local char = player.Character
+    local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if humanoid and root then
+        humanoid:MoveTo(targetPosition)
+        local startTime = os.time()
+        while (root.Position - targetPosition).Magnitude > 5 do
+            if os.time() - startTime > 12 then break end
+            task.wait(0.2)
+        end
+    end
 end
 
 function isPC()
@@ -3287,15 +3498,19 @@ function startAutoCollectTokensLoop()
                 end
             end
             
-            -- Auto Pack Opener Loop
-            if Config.AutoPackOpener then
+            -- Packs & Bundles Automation Loop
+            if Config.AutoPlacePacks or Config.AutoOpenPacks or Config.AutoUseHatchTime then
                 local now = os.time()
-                if not lastPackOpenerCheck or (now - lastPackOpenerCheck) >= 4 then
+                if not lastPackOpenerCheck or (now - lastPackOpenerCheck) >= 3 then
                     lastPackOpenerCheck = now
                     
                     local success, err = pcall(function()
+                        local plotName = player:GetAttribute("Plot")
+                        local plot = workspace.Plots:FindFirstChild(plotName or "")
+                        if not plot then return end
+                        
                         local packsPlaced = ReplicatedData.GetData("PacksPlaced") or {}
-                        local maxPlacements = math.min(Config.AutoPackLimit or 72, ReplicatedData.GetData("MaxPlacements") or 72)
+                        local maxPlacements = math.min(Config.PlaceLimit or 72, ReplicatedData.GetData("MaxPlacements") or 72)
                         
                         local placedCount = 0
                         for _ in pairs(packsPlaced) do
@@ -3313,135 +3528,212 @@ function startAutoCollectTokensLoop()
                             break
                         end
                         
-                        -- Gather all matching packs in inventory
-                        local eligiblePacks = {}
-                        local totalEligibleCount = 0
-                        for pName, amt in pairs(ownedPacks) do
-                            if amt > 0 then
-                                local isMatch = false
-                                if hasHinaSelections then
-                                    isMatch = hinaSelections[pName] == true
-                                else
-                                    isMatch = target:lower() == "all" or string.find(pName:lower(), target:lower())
-                                end
-                                
-                                if isMatch then
-                                    table.insert(eligiblePacks, {name = pName, amount = amt})
-                                    totalEligibleCount = totalEligibleCount + amt
-                                end
-                            end
-                        end
-                        
-                        -- 1. Auto Place Packs rapidly
-                        if placedCount < maxPlacements and totalEligibleCount > 0 then
-                            setDebug(string.format("Placing packs... Current: %d/%d (Inventory: %d)", placedCount, maxPlacements, totalEligibleCount))
-                            local currentPackIdx = 1
-                            while placedCount < maxPlacements and currentPackIdx <= #eligiblePacks do
-                                if not Config.AutoPackOpener then break end
-                                local pack = eligiblePacks[currentPackIdx]
-                                if pack.amount > 0 then
-                                    ReplicatedStorage.Remotes.Card:FireServer("Hotbar", "1", pack.name)
-                                    task.wait(0.05)
-                                    ReplicatedStorage.Remotes.Card:FireServer("Place", pack.name)
-                                    pack.amount = pack.amount - 1
-                                    totalEligibleCount = totalEligibleCount - 1
-                                    placedCount = placedCount + 1
-                                    task.wait(0.15)
-                                else
-                                    currentPackIdx = currentPackIdx + 1
-                                end
-                            end
-                            task.wait(0.5)
-                        end
-                        
-                        -- 2. Auto Apply Potions (Only when threshold met OR we placed all we could and have none left in inventory)
-                        local plotName = player:GetAttribute("Plot")
-                        local plot = workspace.Plots:FindFirstChild(plotName or "")
-                        
-                        local threshold = Config.UsePotionThreshold or 70
-                        local shouldApplyPotions = placedCount >= threshold or (placedCount > 0 and totalEligibleCount == 0)
-                        
-                        if plot and plot:FindFirstChild("Packs") and Config.AutoApplyHatchPotions and shouldApplyPotions then
-                            -- Find if any pack still needs hatching
-                            local hasHatching = false
-                            for _, pack in ipairs(plot.Packs:GetChildren()) do
-                                local prompt = pack:FindFirstChildWhichIsA("ProximityPrompt", true)
-                                if prompt and prompt.Enabled and prompt.ActionText ~= "Open Pack" then
-                                    hasHatching = true
-                                    break
+                        -- 1. Auto Place Packs
+                        if Config.AutoPlacePacks and placedCount < maxPlacements then
+                            -- Determine eligible packs in inventory
+                            local eligiblePacks = {}
+                            local totalEligibleCount = 0
+                            
+                            -- Search by Priority Slots (Slot 1 to 7)
+                            for _, priorityName in ipairs(Config.PrioritySlots) do
+                                if priorityName and priorityName ~= "" then
+                                    local amt = ownedPacks[priorityName] or 0
+                                    if amt > 0 then
+                                        table.insert(eligiblePacks, {name = priorityName, amount = amt})
+                                        totalEligibleCount = totalEligibleCount + amt
+                                    end
                                 end
                             end
                             
-                            if hasHatching then
-                                local consumables = ReplicatedData.GetData("Consumables") or {}
-                                local maxUses = Config.HatchTime1MaxUses or 47
-                                local uses = 0
-                                
-                                setDebug("Applying potions to batch...")
-                                while hasHatching and uses < maxUses do
-                                    if not Config.AutoApplyHatchPotions or not Config.AutoPackOpener then break end
-                                    
-                                    local targetPotion = nil
-                                    if (consumables.HatchTime3 or 0) > 0 then
-                                        targetPotion = "HatchTime3"
-                                        consumables.HatchTime3 = consumables.HatchTime3 - 1
-                                    elseif (consumables.HatchTime2 or 0) > 0 then
-                                        targetPotion = "HatchTime2"
-                                        consumables.HatchTime2 = consumables.HatchTime2 - 1
-                                    elseif (consumables.HatchTime1 or 0) > 0 then
-                                        targetPotion = "HatchTime1"
-                                        consumables.HatchTime1 = consumables.HatchTime1 - 1
+                            -- If we have no priority packs, fall back to Hina Hub selections or manual target
+                            if totalEligibleCount == 0 then
+                                for pName, amt in pairs(ownedPacks) do
+                                    if amt > 0 then
+                                        local isMatch = false
+                                        if Config.SyncHinaHub and hasHinaSelections then
+                                            isMatch = hinaSelections[pName] == true
+                                        else
+                                            isMatch = target:lower() == "all" or string.find(pName:lower(), target:lower())
+                                        end
+                                        
+                                        if isMatch then
+                                            table.insert(eligiblePacks, {name = pName, amount = amt})
+                                            totalEligibleCount = totalEligibleCount + amt
+                                        end
                                     end
+                                end
+                            end
+                            
+                            if totalEligibleCount > 0 then
+                                -- Check if legit walk is enabled (TPPlace is false)
+                                if not Config.TPPlace then
+                                    local floor = plot:FindFirstChild("Misc") and plot.Misc:FindFirstChild("Floor")
+                                    if floor then
+                                        setDebug("Auto-walking to plot floor base to place packs...")
+                                        walkTo(floor.Position)
+                                    end
+                                end
+                                
+                                setDebug(string.format("Placing packs... Current: %d/%d", placedCount, maxPlacements))
+                                local currentPackIdx = 1
+                                while placedCount < maxPlacements and currentPackIdx <= #eligiblePacks do
+                                    if not Config.AutoPlacePacks then break end
+                                    local pack = eligiblePacks[currentPackIdx]
+                                    if pack.amount > 0 then
+                                        ReplicatedStorage.Remotes.Card:FireServer("Hotbar", "1", pack.name)
+                                        task.wait(0.05)
+                                        ReplicatedStorage.Remotes.Card:FireServer("Place", pack.name)
+                                        pack.amount = pack.amount - 1
+                                        totalEligibleCount = totalEligibleCount - 1
+                                        placedCount = placedCount + 1
+                                        task.wait(0.15)
+                                    else
+                                        currentPackIdx = currentPackIdx + 1
+                                    end
+                                end
+                                task.wait(0.5)
+                            end
+                        end
+                        
+                        -- 2. Auto Apply Potions (Hatch Time)
+                        if Config.AutoUseHatchTime and plot:FindFirstChild("Packs") then
+                            local threshold = Config.UseWhenPackPlaced or 70
+                            -- We apply potions if we reached the threshold, or if we placed packs and have no more matching packs left in inventory
+                            local shouldApply = placedCount >= threshold or (placedCount > 0 and not Config.AutoPlacePacks)
+                            
+                            -- Count ready packs to check stop limit
+                            local readyCount = 0
+                            for _, pack in ipairs(plot.Packs:GetChildren()) do
+                                local prompt = pack:FindFirstChildWhichIsA("ProximityPrompt", true)
+                                if prompt and prompt.Enabled and prompt.ActionText == "Open Pack" then
+                                    readyCount = readyCount + 1
+                                end
+                            end
+                            
+                            if readyCount >= (Config.StopAtReadyCount or 1) then
+                                shouldApply = false
+                            end
+                            
+                            if shouldApply then
+                                local hasHatching = false
+                                for _, pack in ipairs(plot.Packs:GetChildren()) do
+                                    local prompt = pack:FindFirstChildWhichIsA("ProximityPrompt", true)
+                                    if prompt and prompt.Enabled and prompt.ActionText ~= "Open Pack" then
+                                        hasHatching = true
+                                        break
+                                    end
+                                end
+                                
+                                if hasHatching then
+                                    local consumables = ReplicatedData.GetData("Consumables") or {}
+                                    local ht3Uses, ht2Uses, ht1Uses = 0, 0, 0
                                     
-                                    if not targetPotion then break end
-                                    
-                                    pcall(function() ReplicatedStorage.Remotes.Potion:FireServer("Apply", targetPotion) end)
-                                    uses = uses + 1
-                                    task.wait(0.2)
-                                    
-                                    -- Check if still hatching
-                                    hasHatching = false
-                                    for _, pack in ipairs(plot.Packs:GetChildren()) do
-                                        local prompt = pack:FindFirstChildWhichIsA("ProximityPrompt", true)
-                                        if prompt and prompt.Enabled and prompt.ActionText ~= "Open Pack" then
-                                            hasHatching = true
+                                    while hasHatching do
+                                        if not Config.AutoUseHatchTime then break end
+                                        
+                                        local targetPotion = nil
+                                        if (consumables.HatchTime3 or 0) > 0 and ht3Uses < (Config.HatchTime3MaxUses or 0) then
+                                            targetPotion = "HatchTime3"
+                                            consumables.HatchTime3 = consumables.HatchTime3 - 1
+                                            ht3Uses = ht3Uses + 1
+                                        elseif (consumables.HatchTime2 or 0) > 0 and ht2Uses < (Config.HatchTime2MaxUses or 0) then
+                                            targetPotion = "HatchTime2"
+                                            consumables.HatchTime2 = consumables.HatchTime2 - 1
+                                            ht2Uses = ht2Uses + 1
+                                        elseif (consumables.HatchTime1 or 0) > 0 and ht1Uses < (Config.HatchTime1MaxUses or 47) then
+                                            targetPotion = "HatchTime1"
+                                            consumables.HatchTime1 = consumables.HatchTime1 - 1
+                                            ht1Uses = ht1Uses + 1
+                                        end
+                                        
+                                        if not targetPotion then break end
+                                        
+                                        setDebug("Hatching: applying " .. targetPotion)
+                                        pcall(function() ReplicatedStorage.Remotes.Potion:FireServer("Apply", targetPotion) end)
+                                        task.wait(0.2)
+                                        
+                                        -- Re-evaluate ready packs
+                                        readyCount = 0
+                                        hasHatching = false
+                                        for _, pack in ipairs(plot.Packs:GetChildren()) do
+                                            local prompt = pack:FindFirstChildWhichIsA("ProximityPrompt", true)
+                                            if prompt and prompt.Enabled then
+                                                if prompt.ActionText == "Open Pack" then
+                                                    readyCount = readyCount + 1
+                                                else
+                                                    hasHatching = true
+                                                end
+                                            end
+                                        end
+                                        
+                                        if readyCount >= (Config.StopAtReadyCount or 1) then
                                             break
                                         end
                                     end
                                 end
-                                setDebug(string.format("Potion batch completed. Applied %d potions.", uses))
                             end
                         end
                         
-                        -- 3. Trigger ProximityPrompt for Ready Packs (Remotely if supported, otherwise teleport)
-                        local char = player.Character
-                        local root = char and char:FindFirstChild("HumanoidRootPart")
-                        
-                        if plot and plot:FindFirstChild("Packs") then
+                        -- 3. Auto Open Packs
+                        if Config.AutoOpenPacks and plot:FindFirstChild("Packs") then
+                            local readyPacks = {}
                             for _, pack in ipairs(plot.Packs:GetChildren()) do
                                 local prompt = pack:FindFirstChildWhichIsA("ProximityPrompt", true)
                                 if prompt and prompt.Enabled and prompt.ActionText == "Open Pack" then
-                                    if fireproximityprompt then
-                                        setDebug("Opening pack remotely: " .. pack.Name)
-                                        pcall(function()
-                                            prompt.HoldDuration = 0
-                                            prompt.RequiresLineOfSight = false
-                                            fireproximityprompt(prompt)
-                                        end)
-                                        task.wait(0.08)
-                                    elseif root then
-                                        setDebug("Teleporting to open pack: " .. pack.Name)
-                                        local oldCFrame = root.CFrame
-                                        root.CFrame = pack:GetPivot()
-                                        task.wait(0.25)
-                                        pcall(function()
-                                            prompt.HoldDuration = 0
-                                            prompt.RequiresLineOfSight = false
-                                            prompt:InputBegan(player)
-                                        end)
-                                        task.wait(0.25)
-                                        root.CFrame = oldCFrame
-                                        task.wait(0.3)
+                                    table.insert(readyPacks, {model = pack, prompt = prompt})
+                                end
+                            end
+                            
+                            local targetReadyOpen = Config.NumReadyToOpen or 1
+                            if #readyPacks >= targetReadyOpen then
+                                local char = player.Character
+                                local root = char and char:FindFirstChild("HumanoidRootPart")
+                                
+                                for _, packData in ipairs(readyPacks) do
+                                    if not Config.AutoOpenPacks then break end
+                                    local pack = packData.model
+                                    local prompt = packData.prompt
+                                    
+                                    if prompt and prompt.Enabled and prompt.ActionText == "Open Pack" then
+                                        if not Config.TPCollect then
+                                            -- Legit walk normally to the ready card model
+                                            setDebug("Walking to open pack: " .. pack.Name)
+                                            walkTo(pack:GetPivot().Position)
+                                            pcall(function()
+                                                prompt.HoldDuration = 0
+                                                prompt.RequiresLineOfSight = false
+                                                if fireproximityprompt then
+                                                    fireproximityprompt(prompt)
+                                                else
+                                                    prompt:InputBegan(player)
+                                                end
+                                            end)
+                                            task.wait(0.3)
+                                        else
+                                            -- Teleport / Remote opening
+                                            if fireproximityprompt then
+                                                setDebug("Opening pack remotely: " .. pack.Name)
+                                                pcall(function()
+                                                    prompt.HoldDuration = 0
+                                                    prompt.RequiresLineOfSight = false
+                                                    fireproximityprompt(prompt)
+                                                end)
+                                                task.wait(0.08)
+                                            elseif root then
+                                                setDebug("Teleporting to open pack: " .. pack.Name)
+                                                local oldCFrame = root.CFrame
+                                                root.CFrame = pack:GetPivot()
+                                                task.wait(0.2)
+                                                pcall(function()
+                                                    prompt.HoldDuration = 0
+                                                    prompt.RequiresLineOfSight = false
+                                                    prompt:InputBegan(player)
+                                                end)
+                                                task.wait(0.2)
+                                                root.CFrame = oldCFrame
+                                                task.wait(0.25)
+                                            end
+                                        end
                                     end
                                 end
                             end
