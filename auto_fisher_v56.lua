@@ -3402,7 +3402,6 @@ function startAutoCollectTokensLoop()
                         warn("[PackOpener] Loop Error: " .. tostring(err))
                     end
                 end
-                end
             end
             
             -- Auto Cooking Check
