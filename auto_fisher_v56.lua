@@ -134,6 +134,12 @@ Config = {
     AutoCookTarget = "Auto All",
     AutoUpgradeRod = false,
     
+    -- Auto Mutation Settings
+    AutoMutateUpgrade = false,
+    AutoMutateDowngrade = false,
+    SelectedUpgradeFish = {},
+    SelectedDowngradeFish = {},
+    
     -- UI Scale
     UIScale = 1.0,
     
@@ -219,6 +225,16 @@ function loadSettings()
                         Config.SelectedPotions = Config.SelectedPotions or {}
                         for key, val in pairs(v) do
                             Config.SelectedPotions[key] = val
+                        end
+                    elseif type(v) == "table" and k == "SelectedUpgradeFish" then
+                        Config.SelectedUpgradeFish = Config.SelectedUpgradeFish or {}
+                        for key, val in pairs(v) do
+                            Config.SelectedUpgradeFish[key] = val
+                        end
+                    elseif type(v) == "table" and k == "SelectedDowngradeFish" then
+                        Config.SelectedDowngradeFish = Config.SelectedDowngradeFish or {}
+                        for key, val in pairs(v) do
+                            Config.SelectedDowngradeFish[key] = val
                         end
                     elseif Config[k] ~= nil then
                         Config[k] = v
@@ -601,7 +617,7 @@ automationTab.Position = UDim2.new(0, 10, 0, 10)
 automationTab.BackgroundTransparency = 1
 automationTab.BorderSizePixel = 0
 automationTab.ScrollBarThickness = 4
-automationTab.CanvasSize = UDim2.new(0, 0, 0, 1110)
+automationTab.CanvasSize = UDim2.new(0, 0, 0, 1270)
 automationTab.Parent = mainPanel
 tabFrames["Automation"] = automationTab
 
@@ -2472,9 +2488,72 @@ end)
 
 end -- end discord card scope block
 
+do -- scope block for Mutation UI
+local mutateCard = createCard(automationTab, "FISH MUTATION AUTOMATION", UDim2.new(1, -10, 0, 160), UDim2.new(0, 0, 0, 1098))
+
+createGridToggle(mutateCard, "🧬 Auto Upgrade Mutator", UDim2.new(0, 0, 0, 20), UDim2.new(1, 0, 0, 18), Config.AutoMutateUpgrade, function(val)
+    Config.AutoMutateUpgrade = val
+    if val then startMutationThread() end
+end)
+
+createGridToggle(mutateCard, "🧬 Auto Downgrade Mutator", UDim2.new(0, 0, 0, 42), UDim2.new(1, 0, 0, 18), Config.AutoMutateDowngrade, function(val)
+    Config.AutoMutateDowngrade = val
+    if val then startMutationThread() end
+end)
+
+-- Dropdown to configure a fish
+local fishNames = {}
+pcall(function()
+    local FishConfig = require(ReplicatedStorage.Modules.Config.Core.FishConfig)
+    for fName, _ in pairs(FishConfig.Fish) do
+        table.insert(fishNames, fName)
+    end
+end)
+table.sort(fishNames)
+
+if #fishNames == 0 then
+    fishNames = {"Tilapia", "Mackerel", "Tuna", "Trout", "Catfish", "Golden Shiner", "Koi", "Flying Fish", "Moonfish", "Flounder", "Sole", "Rockfish", "Pangasius Catfish"}
+end
+
+local activeFish = fishNames[1] or "Tilapia"
+
+-- Sub-panel container for the selected fish settings
+local fishConfigFrame = Instance.new("Frame")
+fishConfigFrame.Size = UDim2.new(1, -16, 0, 45)
+fishConfigFrame.Position = UDim2.new(0, 0, 0, 105)
+fishConfigFrame.BackgroundTransparency = 1
+fishConfigFrame.Parent = mutateCard
+
+local upToggle = nil
+local downToggle = nil
+
+local function updateTogglesForActiveFish()
+    if upToggle then upToggle:Destroy() end
+    if downToggle then downToggle:Destroy() end
+    
+    local upVal = Config.SelectedUpgradeFish[activeFish] == true
+    local downVal = Config.SelectedDowngradeFish[activeFish] == true
+    
+    upToggle = createGridToggle(fishConfigFrame, "⭐ Auto-Upgrade " .. activeFish, UDim2.new(0, 0, 0, 0), UDim2.new(1, 0, 0, 18), upVal, function(val)
+        Config.SelectedUpgradeFish[activeFish] = val
+    end)
+    
+    downToggle = createGridToggle(fishConfigFrame, "⭐ Auto-Downgrade " .. activeFish, UDim2.new(0, 0, 0, 22), UDim2.new(1, 0, 0, 18), downVal, function(val)
+        Config.SelectedDowngradeFish[activeFish] = val
+    end)
+end
+
+createSearchableDropdown(mutateCard, "🐟 Select Fish to Configure:", UDim2.new(0, 0, 0, 64), UDim2.new(1, -16, 0, 20), fishNames, activeFish, function(val)
+    activeFish = val
+    updateTogglesForActiveFish()
+end)
+
+updateTogglesForActiveFish()
+end -- end mutation card scope block
+
 -- Track the dynamic content size to expand scroll height if items change
 automationTab:GetPropertyChangedSignal("AbsoluteWindowSize"):Connect(function()
-    automationTab.CanvasSize = UDim2.new(0, 0, 0, 1228)
+    automationTab.CanvasSize = UDim2.new(0, 0, 0, 1270)
 end)
 
 
@@ -3443,6 +3522,84 @@ function checkAutoUpgradeRod()
         ReplicatedStorage.Remotes.Fish:FireServer("EquipRod", bestOwned)
         task.wait(0.5)
     end
+end
+
+local mutationThread = nil
+
+local function stopMutationThread()
+    if mutationThread then
+        task.cancel(mutationThread)
+        mutationThread = nil
+    end
+end
+
+local function startMutationThread()
+    if mutationThread then return end
+    mutationThread = task.spawn(function()
+        local lastMutateCheck = 0
+        while true do
+            if not Config.AutoMutateUpgrade and not Config.AutoMutateDowngrade then
+                break
+            end
+            
+            local now = os.time()
+            if (now - lastMutateCheck) >= 2.0 then
+                lastMutateCheck = now
+                
+                pcall(function()
+                    local fishInv = ReplicatedData.GetData("Fish") or {}
+                    local equipped = ReplicatedData.GetData("FishEquipped") or {}
+                    
+                    -- 1. Auto Downgrade Process
+                    if Config.AutoMutateDowngrade then
+                        for fName, _ in pairs(Config.SelectedDowngradeFish) do
+                            if Config.SelectedDowngradeFish[fName] == true then
+                                -- Check mutations for this fish from highest to lowest (excluding base)
+                                local mutationTiers = {"Rainbow", "Diamond", "Void", "Emerald", "Gold"}
+                                for _, tier in ipairs(mutationTiers) do
+                                    local fullName = fName .. "-" .. tier
+                                    local fishData = fishInv[fullName]
+                                    if fishData and fishData.Amount > 0 and not fishData.Locked then
+                                        if not table.find(equipped, fullName) then
+                                            setDebug("Downgrading " .. fullName)
+                                            ReplicatedStorage.Remotes.Fish:FireServer("Mutate", fullName, "D")
+                                            task.wait(0.5)
+                                            break -- only do one action per loop to prevent rate limit
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                    
+                    -- 2. Auto Upgrade Process
+                    if Config.AutoMutateUpgrade then
+                        for fName, _ in pairs(Config.SelectedUpgradeFish) do
+                            if Config.SelectedUpgradeFish[fName] == true then
+                                -- Check mutations from base up to Diamond
+                                local upgradeSequence = {"Regular", "Gold", "Emerald", "Void", "Diamond"}
+                                for _, tier in ipairs(upgradeSequence) do
+                                    local fullName = (tier == "Regular") and fName or (fName .. "-" .. tier)
+                                    local fishData = fishInv[fullName]
+                                    if fishData and fishData.Amount >= 3 and not fishData.Locked then
+                                        if not table.find(equipped, fullName) then
+                                            setDebug("Upgrading " .. fullName)
+                                            ReplicatedStorage.Remotes.Fish:FireServer("Mutate", fullName, "U")
+                                            task.wait(0.5)
+                                            break
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end)
+            end
+            
+            task.wait(0.5)
+        end
+        mutationThread = nil
+    end)
 end
 
 local packsThread = nil
@@ -5355,6 +5512,9 @@ if Config.AutoCollectTokens or Config.AutoCollectDragonBalls or Config.AutoRollP
 end
 if Config.AutoPlacePacks or Config.AutoOpenPacks or Config.AutoUseHatchTime then
     startPacksThread()
+end
+if Config.AutoMutateUpgrade or Config.AutoMutateDowngrade then
+    startMutationThread()
 end
 if Config.AutoBuyPacks then
     startAutoBuyPacksLoop()
