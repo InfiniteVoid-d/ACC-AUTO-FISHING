@@ -3603,13 +3603,19 @@ local function startMutationThread()
                     if Config.AutoMutateDowngrade then
                         for fullName, _ in pairs(Config.SelectedDowngradeFish) do
                             if Config.SelectedDowngradeFish[fullName] == true then
-                                local fishData = fishInv[fullName]
-                                if fishData and fishData.Amount > 0 and not fishData.Locked then
-                                    if not table.find(equipped, fullName) then
-                                        setDebug("Downgrading " .. fullName)
+                                local currentInv = ReplicatedData.GetData("Fish") or {}
+                                local fishData = currentInv[fullName]
+                                local amount = fishData and fishData.Amount or 0
+                                local locked = fishData and fishData.Locked or false
+                                
+                                if amount > 0 and not locked and not table.find(equipped, fullName) then
+                                    setDebug("Downgrading " .. amount .. "x " .. fullName)
+                                    for i = 1, amount do
+                                        if not Config.AutoMutateDowngrade or Config.SelectedDowngradeFish[fullName] ~= true then
+                                            break
+                                        end
                                         ReplicatedStorage.Remotes.Fish:FireServer("Mutate", fullName, "D")
-                                        task.wait(0.5)
-                                        break -- only do one action per loop to prevent rate limit
+                                        task.wait(0.1)
                                     end
                                 end
                             end
@@ -3620,13 +3626,20 @@ local function startMutationThread()
                     if Config.AutoMutateUpgrade then
                         for fullName, _ in pairs(Config.SelectedUpgradeFish) do
                             if Config.SelectedUpgradeFish[fullName] == true then
-                                local fishData = fishInv[fullName]
-                                if fishData and fishData.Amount >= 3 and not fishData.Locked then
-                                    if not table.find(equipped, fullName) then
-                                        setDebug("Upgrading " .. fullName)
+                                local currentInv = ReplicatedData.GetData("Fish") or {}
+                                local fishData = currentInv[fullName]
+                                local amount = fishData and fishData.Amount or 0
+                                local locked = fishData and fishData.Locked or false
+                                
+                                if amount >= 3 and not locked and not table.find(equipped, fullName) then
+                                    local upgradeCount = math.floor(amount / 3)
+                                    setDebug("Upgrading " .. (upgradeCount * 3) .. "x " .. fullName)
+                                    for i = 1, upgradeCount do
+                                        if not Config.AutoMutateUpgrade or Config.SelectedUpgradeFish[fullName] ~= true then
+                                            break
+                                        end
                                         ReplicatedStorage.Remotes.Fish:FireServer("Mutate", fullName, "U")
-                                        task.wait(0.5)
-                                        break
+                                        task.wait(0.1)
                                     end
                                 end
                             end
