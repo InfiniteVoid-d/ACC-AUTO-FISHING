@@ -4771,12 +4771,25 @@ function sellDuplicates()
         if Config.ProtectRodIngredients and rodReq[baseName] then
             protect = true
         end
+        
+        -- Check if it is a rare high-multiplier fish (protect it from being sold)
+        local isRare = false
+        pcall(function()
+            local FishConfig = require(game:GetService("ReplicatedStorage").Modules.Config.Core.FishConfig)
+            local fishDef = FishConfig.Fish and FishConfig.Fish[baseName]
+            if fishDef then
+                local mult = fishDef.Multiplier or fishDef.CashMultiplier or 1.0
+                if mult >= 2.0 or baseName == "Giant Whale" or baseName == "Sea King" then
+                    isRare = true
+                end
+            end
+        end)
 
         local targetKeep = 1
-        if protect then
+        if protect or isRare then
             targetKeep = fishData.amount
         elseif hyphenIdx then
-            -- Mutated non-ingredient fish: sell all copies (keep 0) to maximize tokens!
+            -- Mutated non-ingredient common fish: sell all copies (keep 0) to maximize tokens!
             targetKeep = 0
         end
         
