@@ -4772,7 +4772,7 @@ function sellDuplicates()
             protect = true
         end
 
-        local targetKeep = protect and fishData.amount or 1
+        local targetKeep = protect and fishData.amount or 3
         
         local sellCount = fishData.amount - targetKeep
         if sellCount > 0 then
