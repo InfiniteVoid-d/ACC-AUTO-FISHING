@@ -3450,6 +3450,47 @@ local function getRecipeRemainingTime(recipeName)
     return remaining
 end
 
+-- Auto Cooking Ingredient Downgrader Helper (automatically downgrades mutated versions of required fish)
+local function autoDowngradeForIngredients(items)
+    local fishInv = ReplicatedData.GetData("Fish") or {}
+    local equipped = ReplicatedData.GetData("FishEquipped") or {}
+    local tiers = {"Gold", "Emerald", "Void", "Diamond", "Rainbow"}
+    
+    for fName, reqAmt in pairs(items) do
+        local fishData = fishInv[fName]
+        local locked = fishData and fishData.Locked or false
+        local isEquipped = table.find(equipped, fName) ~= nil
+        local availableAmt = (locked or isEquipped) and 0 or (fishData and fishData.Amount or 0)
+        
+        while availableAmt < reqAmt do
+            local downgradedAny = false
+            for _, tier in ipairs(tiers) do
+                local fullName = fName .. "-" .. tier
+                local mData = fishInv[fullName]
+                local mLocked = mData and mData.Locked or false
+                local mEquipped = table.find(equipped, fullName) ~= nil
+                local mAmount = (mLocked or mEquipped) and 0 or (mData and mData.Amount or 0)
+                
+                if mAmount > 0 then
+                    setDebug("Recipe needs " .. fName .. ". Auto-Downgrading " .. fullName)
+                    ReplicatedStorage.Remotes.Fish:FireServer("Mutate", fullName, "D")
+                    task.wait(0.2)
+                    
+                    -- Refresh inventory data
+                    fishInv = ReplicatedData.GetData("Fish") or {}
+                    fishData = fishInv[fName]
+                    availableAmt = (locked or isEquipped) and 0 or (fishData and fishData.Amount or 0)
+                    downgradedAny = true
+                    break
+                end
+            end
+            if not downgradedAny then
+                break
+            end
+        end
+    end
+end
+
 -- Auto Cooking Helper
 function checkAutoCooking()
     local targetRecipe = Config.AutoCookTarget or "Auto All"
@@ -3477,9 +3518,15 @@ function checkAutoCooking()
         if remaining < 10 then -- Only cook if buff is not active or has less than 10 seconds remaining
             local recipe = FishConfig.Recipes[recipeName]
             if recipe and tokens >= recipe.Price then
-                local canCook = true
                 local items = recipe.Ingredients or recipe.Requirements
                 if items then
+                    -- Automatically downgrade mutated variants if needed
+                    autoDowngradeForIngredients(items)
+                    
+                    -- Refresh inventory after auto downgrades
+                    fishInv = ReplicatedData.GetData("Fish") or {}
+                    
+                    local canCook = true
                     for fName, reqAmt in pairs(items) do
                         local fishData = fishInv[fName]
                         local locked = fishData and fishData.Locked or false
@@ -3491,15 +3538,13 @@ function checkAutoCooking()
                             break
                         end
                     end
-                else
-                    canCook = false
-                end
-                
-                if canCook then
-                    setDebug("Auto-Cooking: " .. recipeName)
-                    ReplicatedStorage.Remotes.Fish:FireServer("Cook", recipeName)
-                    task.wait(1.0)
-                    break -- Cooked one, exit loop
+                    
+                    if canCook then
+                        setDebug("Auto-Cooking: " .. recipeName)
+                        ReplicatedStorage.Remotes.Fish:FireServer("Cook", recipeName)
+                        task.wait(1.0)
+                        break -- Cooked one, exit loop
+                    end
                 end
             end
         end
