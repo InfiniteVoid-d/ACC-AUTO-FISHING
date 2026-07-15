@@ -2501,12 +2501,17 @@ createGridToggle(mutateCard, "🧬 Auto Downgrade Mutator", UDim2.new(0, 0, 0, 4
     if val then startMutationThread() end
 end)
 
--- Dropdown to configure a fish
+-- Dropdown to configure a fish (combines fish names with mutation states)
 local fishNames = {}
 pcall(function()
     local FishConfig = require(ReplicatedStorage.Modules.Config.Core.FishConfig)
     for fName, _ in pairs(FishConfig.Fish) do
-        table.insert(fishNames, fName)
+        table.insert(fishNames, fName) -- Regular
+        table.insert(fishNames, fName .. "-Gold")
+        table.insert(fishNames, fName .. "-Emerald")
+        table.insert(fishNames, fName .. "-Void")
+        table.insert(fishNames, fName .. "-Diamond")
+        table.insert(fishNames, fName .. "-Rainbow")
     end
 end)
 table.sort(fishNames)
@@ -2562,18 +2567,28 @@ local function updateTogglesForActiveFish()
     if upToggle and upToggle.Parent then upToggle.Parent:Destroy() end
     if downToggle and downToggle.Parent then downToggle.Parent:Destroy() end
     
+    local hasHyphen = activeFish:find("-") ~= nil
+    local isRainbow = activeFish:find("-Rainbow") ~= nil
+    
     local upVal = Config.SelectedUpgradeFish[activeFish] == true
     local downVal = Config.SelectedDowngradeFish[activeFish] == true
     
-    upToggle = createGridToggle(fishConfigFrame, "⭐ Auto-Upgrade " .. activeFish, UDim2.new(0, 0, 0, 0), UDim2.new(1, 0, 0, 18), upVal, function(val)
-        Config.SelectedUpgradeFish[activeFish] = val
-        updateSelectedListText()
-    end)
+    -- Show Upgrade toggle if NOT Rainbow
+    if not isRainbow then
+        upToggle = createGridToggle(fishConfigFrame, "⭐ Auto-Upgrade " .. activeFish, UDim2.new(0, 0, 0, 0), UDim2.new(1, 0, 0, 18), upVal, function(val)
+            Config.SelectedUpgradeFish[activeFish] = val
+            updateSelectedListText()
+        end)
+    end
     
-    downToggle = createGridToggle(fishConfigFrame, "⭐ Auto-Downgrade " .. activeFish, UDim2.new(0, 0, 0, 22), UDim2.new(1, 0, 0, 18), downVal, function(val)
-        Config.SelectedDowngradeFish[activeFish] = val
-        updateSelectedListText()
-    end)
+    -- Show Downgrade toggle if hasHyphen (meaning it's mutated)
+    if hasHyphen then
+        local pos = isRainbow and UDim2.new(0, 0, 0, 0) or UDim2.new(0, 0, 0, 22)
+        downToggle = createGridToggle(fishConfigFrame, "⭐ Auto-Downgrade " .. activeFish, pos, UDim2.new(1, 0, 0, 18), downVal, function(val)
+            Config.SelectedDowngradeFish[activeFish] = val
+            updateSelectedListText()
+        end)
+    end
 end
 
 createSearchableDropdown(mutateCard, "🐟 Select Fish to Configure:", UDim2.new(0, 0, 0, 64), UDim2.new(1, -16, 0, 20), fishNames, activeFish, function(val)
@@ -3586,20 +3601,15 @@ local function startMutationThread()
                     
                     -- 1. Auto Downgrade Process
                     if Config.AutoMutateDowngrade then
-                        for fName, _ in pairs(Config.SelectedDowngradeFish) do
-                            if Config.SelectedDowngradeFish[fName] == true then
-                                -- Check mutations for this fish from highest to lowest (excluding base)
-                                local mutationTiers = {"Rainbow", "Diamond", "Void", "Emerald", "Gold"}
-                                for _, tier in ipairs(mutationTiers) do
-                                    local fullName = fName .. "-" .. tier
-                                    local fishData = fishInv[fullName]
-                                    if fishData and fishData.Amount > 0 and not fishData.Locked then
-                                        if not table.find(equipped, fullName) then
-                                            setDebug("Downgrading " .. fullName)
-                                            ReplicatedStorage.Remotes.Fish:FireServer("Mutate", fullName, "D")
-                                            task.wait(0.5)
-                                            break -- only do one action per loop to prevent rate limit
-                                        end
+                        for fullName, _ in pairs(Config.SelectedDowngradeFish) do
+                            if Config.SelectedDowngradeFish[fullName] == true then
+                                local fishData = fishInv[fullName]
+                                if fishData and fishData.Amount > 0 and not fishData.Locked then
+                                    if not table.find(equipped, fullName) then
+                                        setDebug("Downgrading " .. fullName)
+                                        ReplicatedStorage.Remotes.Fish:FireServer("Mutate", fullName, "D")
+                                        task.wait(0.5)
+                                        break -- only do one action per loop to prevent rate limit
                                     end
                                 end
                             end
@@ -3608,20 +3618,15 @@ local function startMutationThread()
                     
                     -- 2. Auto Upgrade Process
                     if Config.AutoMutateUpgrade then
-                        for fName, _ in pairs(Config.SelectedUpgradeFish) do
-                            if Config.SelectedUpgradeFish[fName] == true then
-                                -- Check mutations from base up to Diamond
-                                local upgradeSequence = {"Regular", "Gold", "Emerald", "Void", "Diamond"}
-                                for _, tier in ipairs(upgradeSequence) do
-                                    local fullName = (tier == "Regular") and fName or (fName .. "-" .. tier)
-                                    local fishData = fishInv[fullName]
-                                    if fishData and fishData.Amount >= 3 and not fishData.Locked then
-                                        if not table.find(equipped, fullName) then
-                                            setDebug("Upgrading " .. fullName)
-                                            ReplicatedStorage.Remotes.Fish:FireServer("Mutate", fullName, "U")
-                                            task.wait(0.5)
-                                            break
-                                        end
+                        for fullName, _ in pairs(Config.SelectedUpgradeFish) do
+                            if Config.SelectedUpgradeFish[fullName] == true then
+                                local fishData = fishInv[fullName]
+                                if fishData and fishData.Amount >= 3 and not fishData.Locked then
+                                    if not table.find(equipped, fullName) then
+                                        setDebug("Upgrading " .. fullName)
+                                        ReplicatedStorage.Remotes.Fish:FireServer("Mutate", fullName, "U")
+                                        task.wait(0.5)
+                                        break
                                     end
                                 end
                             end
