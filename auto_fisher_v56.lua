@@ -599,6 +599,16 @@ automationTab.CanvasSize = UDim2.new(0, 0, 0, 1110)
 automationTab.Parent = mainPanel
 tabFrames["Automation"] = automationTab
 
+local activeDropdownList = nil
+
+local function getGuiRoot(obj)
+    local p = obj
+    while p and p.Parent and p.Parent.ClassName ~= "ScreenGui" do
+        p = p.Parent
+    end
+    return p
+end
+
 local function createDropdown(parent, labelText, position, size, options, defaultVal, callback)
     local frame = Instance.new("Frame")
     frame.Size = size
@@ -630,15 +640,14 @@ local function createDropdown(parent, labelText, position, size, options, defaul
     
     local listFrame = Instance.new("ScrollingFrame")
     listFrame.Size = UDim2.new(0, 115, 0, 150)
-    listFrame.Position = UDim2.new(1, -115, 0, 20)
     listFrame.BackgroundColor3 = Color3.fromRGB(24, 24, 28)
     listFrame.BorderSizePixel = 0
     listFrame.ScrollBarThickness = 4
     listFrame.Visible = false
-    listFrame.ZIndex = 50
-    listFrame.Parent = frame
+    listFrame.ZIndex = 999999
     Instance.new("UICorner", listFrame).CornerRadius = UDim.new(0, 6)
-    Instance.new("UIStroke", listFrame).Color = Color3.fromRGB(50, 50, 60)
+    local listStroke = Instance.new("UIStroke", listFrame)
+    listStroke.Color = Color3.fromRGB(50, 50, 60)
     
     local yOffset = 0
     for _, opt in ipairs(options) do
@@ -651,12 +660,16 @@ local function createDropdown(parent, labelText, position, size, options, defaul
         optBtn.TextColor3 = Color3.fromRGB(200, 200, 210)
         optBtn.TextSize = 9
         optBtn.Font = Enum.Font.Gotham
-        optBtn.ZIndex = 51
+        optBtn.ZIndex = 1000000
         optBtn.Parent = listFrame
         
         optBtn.MouseButton1Click:Connect(function()
             btn.Text = opt
             listFrame.Visible = false
+            listFrame.Parent = nil
+            if activeDropdownList == listFrame then
+                activeDropdownList = nil
+            end
             callback(opt)
         end)
         
@@ -665,7 +678,32 @@ local function createDropdown(parent, labelText, position, size, options, defaul
     listFrame.CanvasSize = UDim2.new(0, 0, 0, yOffset)
     
     btn.MouseButton1Click:Connect(function()
-        listFrame.Visible = not listFrame.Visible
+        if listFrame.Visible then
+            listFrame.Visible = false
+            listFrame.Parent = nil
+            if activeDropdownList == listFrame then
+                activeDropdownList = nil
+            end
+        else
+            if activeDropdownList then
+                activeDropdownList.Visible = false
+                activeDropdownList.Parent = nil
+            end
+            
+            local root = getGuiRoot(btn)
+            local absPos = btn.AbsolutePosition
+            local rootPos = root.AbsolutePosition
+            
+            listFrame.Position = UDim2.new(0, absPos.X - rootPos.X, 0, absPos.Y - rootPos.Y + btn.AbsoluteSize.Y)
+            listFrame.Size = UDim2.new(0, btn.AbsoluteSize.X, 0, math.min(150, yOffset))
+            listFrame.Parent = root
+            listFrame.Visible = true
+            activeDropdownList = listFrame
+        end
+    end)
+    
+    frame.Destroying:Connect(function()
+        listFrame:Destroy()
     end)
     
     return frame
@@ -702,14 +740,13 @@ local function createSearchableDropdown(parent, labelText, position, size, optio
     
     local dropdownContainer = Instance.new("Frame")
     dropdownContainer.Size = UDim2.new(0, 115, 0, 180)
-    dropdownContainer.Position = UDim2.new(1, -115, 0, 20)
     dropdownContainer.BackgroundColor3 = Color3.fromRGB(24, 24, 28)
     dropdownContainer.BorderSizePixel = 0
     dropdownContainer.Visible = false
-    dropdownContainer.ZIndex = 100
-    dropdownContainer.Parent = frame
+    dropdownContainer.ZIndex = 999999
     Instance.new("UICorner", dropdownContainer).CornerRadius = UDim.new(0, 6)
-    Instance.new("UIStroke", dropdownContainer).Color = Color3.fromRGB(50, 50, 60)
+    local containerStroke = Instance.new("UIStroke", dropdownContainer)
+    containerStroke.Color = Color3.fromRGB(50, 50, 60)
     
     local searchBar = Instance.new("TextBox")
     searchBar.Size = UDim2.new(1, -8, 0, 20)
@@ -721,7 +758,7 @@ local function createSearchableDropdown(parent, labelText, position, size, optio
     searchBar.TextSize = 9
     searchBar.Font = Enum.Font.Gotham
     searchBar.ClearTextOnFocus = false
-    searchBar.ZIndex = 101
+    searchBar.ZIndex = 1000000
     searchBar.Parent = dropdownContainer
     Instance.new("UICorner", searchBar).CornerRadius = UDim.new(0, 4)
     
@@ -731,7 +768,7 @@ local function createSearchableDropdown(parent, labelText, position, size, optio
     listFrame.BackgroundTransparency = 1
     listFrame.BorderSizePixel = 0
     listFrame.ScrollBarThickness = 3
-    listFrame.ZIndex = 101
+    listFrame.ZIndex = 1000000
     listFrame.Parent = dropdownContainer
     
     local function populateList(filterText)
@@ -748,12 +785,16 @@ local function createSearchableDropdown(parent, labelText, position, size, optio
                 optBtn.TextColor3 = Color3.fromRGB(200, 200, 210)
                 optBtn.TextSize = 9
                 optBtn.Font = Enum.Font.Gotham
-                optBtn.ZIndex = 102
+                optBtn.ZIndex = 1000001
                 optBtn.Parent = listFrame
                 
                 optBtn.MouseButton1Click:Connect(function()
                     btn.Text = opt
                     dropdownContainer.Visible = false
+                    dropdownContainer.Parent = nil
+                    if activeDropdownList == dropdownContainer then
+                        activeDropdownList = nil
+                    end
                     callback(opt)
                 end)
                 
@@ -770,12 +811,36 @@ local function createSearchableDropdown(parent, labelText, position, size, optio
     end)
     
     btn.MouseButton1Click:Connect(function()
-        dropdownContainer.Visible = not dropdownContainer.Visible
         if dropdownContainer.Visible then
+            dropdownContainer.Visible = false
+            dropdownContainer.Parent = nil
+            if activeDropdownList == dropdownContainer then
+                activeDropdownList = nil
+            end
+        else
+            if activeDropdownList then
+                activeDropdownList.Visible = false
+                activeDropdownList.Parent = nil
+            end
+            
+            local root = getGuiRoot(btn)
+            local absPos = btn.AbsolutePosition
+            local rootPos = root.AbsolutePosition
+            
+            dropdownContainer.Position = UDim2.new(0, absPos.X - rootPos.X, 0, absPos.Y - rootPos.Y + btn.AbsoluteSize.Y)
+            dropdownContainer.Size = UDim2.new(0, btn.AbsoluteSize.X, 0, 180)
+            dropdownContainer.Parent = root
+            dropdownContainer.Visible = true
+            activeDropdownList = dropdownContainer
+            
             searchBar.Text = ""
             searchBar:CaptureFocus()
             populateList("")
         end
+    end)
+    
+    frame.Destroying:Connect(function()
+        dropdownContainer:Destroy()
     end)
     
     return frame
