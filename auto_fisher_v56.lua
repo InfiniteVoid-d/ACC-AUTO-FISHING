@@ -2130,8 +2130,6 @@ end
 
 function startAutoCollectLoop()
     cancelCollectThread()
-    local maxPages = 30
-    
     collectThread = task.spawn(function()
         -- Thread A: Parallel Card Binder Page-turning Sweep (Runs in parallel with floor collection)
         task.spawn(function()
@@ -2139,6 +2137,30 @@ function startAutoCollectLoop()
                 local CardRemote = ReplicatedStorage.Remotes:FindFirstChild("Card")
                 if CardRemote then
                     setDebug("Starting binder page sweep...")
+                    
+                    local maxPages = 31 -- dynamic resolution with 31 default fallback
+                    pcall(function()
+                        local maxVal = ReplicatedData.GetData("MaxPages") or ReplicatedData.GetData("BinderPages") or ReplicatedData.GetData("MaxBinderPages") or ReplicatedData.GetData("Pages")
+                        if maxVal and type(maxVal) == "number" then
+                            maxPages = maxVal
+                        else
+                            local cardGui = PlayerGui:FindFirstChild("Card")
+                            local frame = cardGui and cardGui:FindFirstChild("Frame")
+                            if frame then
+                                for _, child in ipairs(frame:GetDescendants()) do
+                                    if child:IsA("TextLabel") and child.Text:find("/") and (child.Text:lower():find("page") or child.Name:lower():find("page")) then
+                                        local total = child.Text:match("/%s*(%d+)")
+                                        if total then
+                                            maxPages = tonumber(total) or maxPages
+                                            break
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end)
+                    maxPages = math.max(31, maxPages) -- enforce at least 31
+                    
                     for page = 1, maxPages do
                         if not Config.AutoCollect then break end
                         
