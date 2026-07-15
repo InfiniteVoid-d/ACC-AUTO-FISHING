@@ -126,6 +126,7 @@ Config = {
     PrioritySlots = {"", "", "", "", "", "", ""},
     AutoPackTarget = "Ghoul",
     SelectedPacks = {},
+    SelectedPotions = { HatchTime1 = true, HatchTime2 = true, HatchTime3 = true },
     ActiveGenre = "Shadow",
     
     -- Auto Cook & Rod Settings
@@ -213,6 +214,11 @@ function loadSettings()
                         Config.SelectedPacks = Config.SelectedPacks or {}
                         for key, val in pairs(v) do
                             Config.SelectedPacks[key] = val
+                        end
+                    elseif type(v) == "table" and k == "SelectedPotions" then
+                        Config.SelectedPotions = Config.SelectedPotions or {}
+                        for key, val in pairs(v) do
+                            Config.SelectedPotions[key] = val
                         end
                     elseif Config[k] ~= nil then
                         Config[k] = v
@@ -1579,7 +1585,7 @@ do
     
     createGridToggle(placeCard, "📦 Auto Place Packs", UDim2.new(0, 0, 0, 20), UDim2.new(1, 0, 0, 18), Config.AutoPlacePacks, function(val)
         Config.AutoPlacePacks = val
-        if autoFishing then startAutoCollectTokensLoop() end
+        if val then startPacksThread() end
     end)
     
     createGridToggle(placeCard, "⚡ TP Place (Faster)", UDim2.new(0, 0, 0, 42), UDim2.new(1, 0, 0, 18), Config.TPPlace, function(val)
@@ -1821,114 +1827,20 @@ do
     
     createGridToggle(hatchCard, "🧪 Auto Use Hatch Time", UDim2.new(0, 0, 0, 20), UDim2.new(1, 0, 0, 18), Config.AutoUseHatchTime, function(val)
         Config.AutoUseHatchTime = val
+        if val then startPacksThread() end
     end)
     
-    -- Hatch Time I Max uses Row
-    local ht1Row = Instance.new("Frame")
-    ht1Row.Size = UDim2.new(1, -16, 0, 20)
-    ht1Row.Position = UDim2.new(0, 0, 0, 42)
-    ht1Row.BackgroundTransparency = 1
-    ht1Row.Parent = hatchCard
-    
-    local ht1Label = Instance.new("TextLabel")
-    ht1Label.Size = UDim2.new(1, -105, 1, 0)
-    ht1Label.Position = UDim2.new(0, 8, 0, 0)
-    ht1Label.BackgroundTransparency = 1
-    ht1Label.Text = "⚡ Hatch Time I Max Uses:"
-    ht1Label.TextColor3 = Color3.fromRGB(200, 200, 210)
-    ht1Label.TextSize = 10
-    ht1Label.TextXAlignment = Enum.TextXAlignment.Left
-    ht1Label.Font = Enum.Font.Gotham
-    ht1Label.Parent = ht1Row
-    
-    local ht1Input = Instance.new("TextBox")
-    ht1Input.Size = UDim2.new(0, 95, 0, 16)
-    ht1Input.Position = UDim2.new(1, -95, 0.5, -8)
-    ht1Input.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
-    ht1Input.TextColor3 = Color3.fromRGB(255, 255, 255)
-    ht1Input.Text = tostring(Config.HatchTime1MaxUses)
-    ht1Input.PlaceholderText = "e.g. 47"
-    ht1Input.TextSize = 10
-    ht1Input.Font = Enum.Font.GothamBold
-    ht1Input.ClearTextOnFocus = false
-    ht1Input.Parent = ht1Row
-    Instance.new("UICorner", ht1Input).CornerRadius = UDim.new(0, 4)
-    
-    ht1Input.FocusLost:Connect(function()
-        local val = tonumber(ht1Input.Text)
-        if val then Config.HatchTime1MaxUses = val else ht1Input.Text = tostring(Config.HatchTime1MaxUses) end
+    -- Selected Potions Checkbox Toggles
+    createGridToggle(hatchCard, "🧪 Use Hatch Time I Potion", UDim2.new(0, 0, 0, 42), UDim2.new(1, 0, 0, 18), Config.SelectedPotions["HatchTime1"], function(val)
+        Config.SelectedPotions["HatchTime1"] = val
     end)
     
-    -- Hatch Time II Max uses Row
-    local ht2Row = Instance.new("Frame")
-    ht2Row.Size = UDim2.new(1, -16, 0, 20)
-    ht2Row.Position = UDim2.new(0, 0, 0, 64)
-    ht2Row.BackgroundTransparency = 1
-    ht2Row.Parent = hatchCard
-    
-    local ht2Label = Instance.new("TextLabel")
-    ht2Label.Size = UDim2.new(1, -105, 1, 0)
-    ht2Label.Position = UDim2.new(0, 8, 0, 0)
-    ht2Label.BackgroundTransparency = 1
-    ht2Label.Text = "⚡ Hatch Time II Max Uses:"
-    ht2Label.TextColor3 = Color3.fromRGB(200, 200, 210)
-    ht2Label.TextSize = 10
-    ht2Label.TextXAlignment = Enum.TextXAlignment.Left
-    ht2Label.Font = Enum.Font.Gotham
-    ht2Label.Parent = ht2Row
-    
-    local ht2Input = Instance.new("TextBox")
-    ht2Input.Size = UDim2.new(0, 95, 0, 16)
-    ht2Input.Position = UDim2.new(1, -95, 0.5, -8)
-    ht2Input.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
-    ht2Input.TextColor3 = Color3.fromRGB(255, 255, 255)
-    ht2Input.Text = tostring(Config.HatchTime2MaxUses)
-    ht2Input.PlaceholderText = "e.g. 0"
-    ht2Input.TextSize = 10
-    ht2Input.Font = Enum.Font.GothamBold
-    ht2Input.ClearTextOnFocus = false
-    ht2Input.Parent = ht2Row
-    Instance.new("UICorner", ht2Input).CornerRadius = UDim.new(0, 4)
-    
-    ht2Input.FocusLost:Connect(function()
-        local val = tonumber(ht2Input.Text)
-        if val then Config.HatchTime2MaxUses = val else ht2Input.Text = tostring(Config.HatchTime2MaxUses) end
+    createGridToggle(hatchCard, "🧪 Use Hatch Time II Potion", UDim2.new(0, 0, 0, 64), UDim2.new(1, 0, 0, 18), Config.SelectedPotions["HatchTime2"], function(val)
+        Config.SelectedPotions["HatchTime2"] = val
     end)
     
-    -- Hatch Time III Max uses Row
-    local ht3Row = Instance.new("Frame")
-    ht3Row.Size = UDim2.new(1, -16, 0, 20)
-    ht3Row.Position = UDim2.new(0, 0, 0, 86)
-    ht3Row.BackgroundTransparency = 1
-    ht3Row.Parent = hatchCard
-    
-    local ht3Label = Instance.new("TextLabel")
-    ht3Label.Size = UDim2.new(1, -105, 1, 0)
-    ht3Label.Position = UDim2.new(0, 8, 0, 0)
-    ht3Label.BackgroundTransparency = 1
-    ht3Label.Text = "⚡ Hatch Time III Max Uses:"
-    ht3Label.TextColor3 = Color3.fromRGB(200, 200, 210)
-    ht3Label.TextSize = 10
-    ht3Label.TextXAlignment = Enum.TextXAlignment.Left
-    ht3Label.Font = Enum.Font.Gotham
-    ht3Label.Parent = ht3Row
-    
-    local ht3Input = Instance.new("TextBox")
-    ht3Input.Size = UDim2.new(0, 95, 0, 16)
-    ht3Input.Position = UDim2.new(1, -95, 0.5, -8)
-    ht3Input.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
-    ht3Input.TextColor3 = Color3.fromRGB(255, 255, 255)
-    ht3Input.Text = tostring(Config.HatchTime3MaxUses)
-    ht3Input.PlaceholderText = "e.g. 0"
-    ht3Input.TextSize = 10
-    ht3Input.Font = Enum.Font.GothamBold
-    ht3Input.ClearTextOnFocus = false
-    ht3Input.Parent = ht3Row
-    Instance.new("UICorner", ht3Input).CornerRadius = UDim.new(0, 4)
-    
-    ht3Input.FocusLost:Connect(function()
-        local val = tonumber(ht3Input.Text)
-        if val then Config.HatchTime3MaxUses = val else ht3Input.Text = tostring(Config.HatchTime3MaxUses) end
+    createGridToggle(hatchCard, "🧪 Use Hatch Time III Potion", UDim2.new(0, 0, 0, 86), UDim2.new(1, 0, 0, 18), Config.SelectedPotions["HatchTime3"], function(val)
+        Config.SelectedPotions["HatchTime3"] = val
     end)
     
     -- Stop at # Ready Row
@@ -1972,7 +1884,7 @@ do
     
     createGridToggle(openCard, "📂 Auto Open Packs", UDim2.new(0, 0, 0, 20), UDim2.new(1, 0, 0, 18), Config.AutoOpenPacks, function(val)
         Config.AutoOpenPacks = val
-        if autoFishing then startAutoCollectTokensLoop() end
+        if val then startPacksThread() end
     end)
     
     createGridToggle(openCard, "⚡ TP Collect (Faster)", UDim2.new(0, 0, 0, 42), UDim2.new(1, 0, 0, 18), Config.TPCollect, function(val)
@@ -3533,8 +3445,257 @@ function checkAutoUpgradeRod()
     end
 end
 
+local packsThread = nil
+
+local function stopPacksThread()
+    if packsThread then
+        task.cancel(packsThread)
+        packsThread = nil
+    end
+end
+
+local function startPacksThread()
+    if packsThread then return end
+    packsThread = task.spawn(function()
+        local lastPackOpenerCheck = 0
+        while true do
+            if not Config.AutoPlacePacks and not Config.AutoOpenPacks and not Config.AutoUseHatchTime then
+                break
+            end
+            
+            local now = os.time()
+            if (now - lastPackOpenerCheck) >= 1.5 then
+                lastPackOpenerCheck = now
+                
+                local success, err = pcall(function()
+                    local plotName = player:GetAttribute("Plot")
+                    local plot = workspace.Plots:FindFirstChild(plotName or "")
+                    if not plot then return end
+                    
+                    local packsPlaced = ReplicatedData.GetData("PacksPlaced") or {}
+                    local maxPlacements = math.min(Config.PlaceLimit or 72, ReplicatedData.GetData("MaxPlacements") or 72)
+                    
+                    local placedCount = 0
+                    for _ in pairs(packsPlaced) do
+                        placedCount = placedCount + 1
+                    end
+                    
+                    local ownedPacks = ReplicatedData.GetData("Packs") or {}
+                    
+                    -- Load Hina Hub selections if available
+                    local hinaSelections = getHinaSelections()
+                    local hasHinaSelections = false
+                    for _ in pairs(hinaSelections) do
+                        hasHinaSelections = true
+                        break
+                    end
+                    
+                    -- 1. Auto Place Packs
+                    if Config.AutoPlacePacks and placedCount < maxPlacements then
+                        -- Determine eligible packs in inventory
+                        local eligiblePacks = {}
+                        local totalEligibleCount = 0
+                        
+                        local matchedPacks = {}
+                        -- Search by Priority Slots (Slot 1 to 7)
+                        for _, priorityName in ipairs(Config.PrioritySlots) do
+                            if priorityName and priorityName ~= "" then
+                                for pName, amt in pairs(ownedPacks) do
+                                    if amt > 0 and not matchedPacks[pName] and string.find(pName:lower(), priorityName:lower()) then
+                                        matchedPacks[pName] = true
+                                        table.insert(eligiblePacks, {name = pName, amount = amt})
+                                        totalEligibleCount = totalEligibleCount + amt
+                                    end
+                                end
+                            end
+                        end
+                        
+                        -- If we have no priority packs, fall back to Hina Hub selections or manual target
+                        if totalEligibleCount == 0 then
+                            for pName, amt in pairs(ownedPacks) do
+                                if amt > 0 then
+                                    local isMatch = false
+                                    if Config.SyncHinaHub and hasHinaSelections then
+                                        isMatch = hinaSelections[pName] == true
+                                    else
+                                        isMatch = Config.SelectedPacks[pName] == true
+                                    end
+                                    
+                                    if isMatch then
+                                        table.insert(eligiblePacks, {name = pName, amount = amt})
+                                        totalEligibleCount = totalEligibleCount + amt
+                                    end
+                                end
+                            end
+                        end
+                        
+                        if totalEligibleCount > 0 then
+                            -- Check if legit walk is enabled (TPPlace is false)
+                            if not Config.TPPlace then
+                                local floor = plot:FindFirstChild("Misc") and plot.Misc:FindFirstChild("Floor")
+                                if floor then
+                                    setDebug("Auto-walking to plot floor base to place packs...")
+                                    walkTo(floor.Position)
+                                end
+                            end
+                            
+                            setDebug(string.format("Placing packs... Current: %d/%d", placedCount, maxPlacements))
+                            local currentPackIdx = 1
+                            while placedCount < maxPlacements and currentPackIdx <= #eligiblePacks do
+                                if not Config.AutoPlacePacks then break end
+                                local pack = eligiblePacks[currentPackIdx]
+                                if pack.amount > 0 then
+                                    -- Equip pack to hotbar slot 1
+                                    ReplicatedStorage.Remotes.Card:FireServer("Hotbar", "1", pack.name)
+                                    task.wait(0.05)
+                                    -- Place the pack
+                                    ReplicatedStorage.Remotes.Card:FireServer("Place", pack.name)
+                                    pack.amount = pack.amount - 1
+                                    placedCount = placedCount + 1
+                                    task.wait(0.08) -- Rapid placement!
+                                else
+                                    currentPackIdx = currentPackIdx + 1
+                                end
+                            end
+                        end
+                    end
+                    
+                    -- 2. Auto Use Hatch Time Potions
+                    if Config.AutoUseHatchTime and plot:FindFirstChild("Packs") then
+                        local threshold = Config.UseWhenPackPlaced or 70
+                        local shouldApply = placedCount >= threshold or (placedCount > 0 and not Config.AutoPlacePacks)
+                        
+                        -- Count ready packs to check stop limit
+                        local readyCount = 0
+                        local hasHatching = false
+                        for _, pack in ipairs(plot.Packs:GetChildren()) do
+                            local prompt = pack:FindFirstChildWhichIsA("ProximityPrompt", true)
+                            if prompt and prompt.Enabled then
+                                if prompt.ActionText == "Open Pack" then
+                                    readyCount = readyCount + 1
+                                else
+                                    hasHatching = true
+                                end
+                            end
+                        end
+                        
+                        if shouldApply and hasHatching and readyCount < (Config.StopAtReadyCount or 1) then
+                            -- Get count of active hatch potions on our plot floor
+                            local activeHatchPotions = 0
+                            local activeArea = plot:FindFirstChild("Active")
+                            if activeArea then
+                                for _, child in ipairs(activeArea:GetChildren()) do
+                                    if child.Name:find("HatchTime") then
+                                        activeHatchPotions = activeHatchPotions + 1
+                                    end
+                                end
+                            end
+                            
+                            -- If we don't exceed max simultaneous active potions (default 3)
+                            if activeHatchPotions < 3 then
+                                local consumables = ReplicatedData.GetData("Consumables") or {}
+                                local targetPotion = nil
+                                
+                                -- Check checkboxes in GUI for selected potions
+                                local ht3Selected = Config.SelectedPotions and Config.SelectedPotions["HatchTime3"] == true
+                                local ht2Selected = Config.SelectedPotions and Config.SelectedPotions["HatchTime2"] == true
+                                local ht1Selected = Config.SelectedPotions and Config.SelectedPotions["HatchTime1"] == true
+                                
+                                if ht3Selected and (consumables.HatchTime3 or 0) > 0 then
+                                    targetPotion = "HatchTime3"
+                                elseif ht2Selected and (consumables.HatchTime2 or 0) > 0 then
+                                    targetPotion = "HatchTime2"
+                                elseif ht1Selected and (consumables.HatchTime1 or 0) > 0 then
+                                    targetPotion = "HatchTime1"
+                                end
+                                
+                                if targetPotion then
+                                    setDebug("Hatching: applying " .. targetPotion)
+                                    pcall(function() ReplicatedStorage.Remotes.Potion:FireServer("Apply", targetPotion) end)
+                                    task.wait(0.2)
+                                end
+                            end
+                        end
+                    end
+                    
+                    -- 3. Auto Open Packs
+                    if Config.AutoOpenPacks and plot:FindFirstChild("Packs") then
+                        local readyPacks = {}
+                        for _, pack in ipairs(plot.Packs:GetChildren()) do
+                            local prompt = pack:FindFirstChildWhichIsA("ProximityPrompt", true)
+                            if prompt and prompt.Enabled and prompt.ActionText == "Open Pack" then
+                                table.insert(readyPacks, {model = pack, prompt = prompt})
+                            end
+                        end
+                        
+                        local targetReadyOpen = Config.NumReadyToOpen or 1
+                        if #readyPacks >= targetReadyOpen then
+                            local char = player.Character
+                            local root = char and char:FindFirstChild("HumanoidRootPart")
+                            
+                            for _, packData in ipairs(readyPacks) do
+                                if not Config.AutoOpenPacks then break end
+                                local pack = packData.model
+                                local prompt = packData.prompt
+                                
+                                if prompt and prompt.Enabled and prompt.ActionText == "Open Pack" then
+                                    if not Config.TPCollect then
+                                        -- Legit walk normally to the ready card model
+                                        setDebug("Walking to open pack: " .. pack.Name)
+                                        walkTo(pack:GetPivot().Position)
+                                        pcall(function()
+                                            prompt.HoldDuration = 0
+                                            prompt.RequiresLineOfSight = false
+                                            if fireproximityprompt then
+                                                fireproximityprompt(prompt)
+                                            else
+                                                prompt:InputBegan(player)
+                                            end
+                                        end)
+                                        task.wait(0.3)
+                                    else
+                                        -- Teleport / Remote opening
+                                        if fireproximityprompt then
+                                            setDebug("Opening pack remotely: " .. pack.Name)
+                                            pcall(function()
+                                                prompt.HoldDuration = 0
+                                                prompt.RequiresLineOfSight = false
+                                                fireproximityprompt(prompt)
+                                            end)
+                                            task.wait(0.08)
+                                        elseif root then
+                                            setDebug("Teleporting to open pack: " .. pack.Name)
+                                            local oldCFrame = root.CFrame
+                                            root.CFrame = pack:GetPivot()
+                                            task.wait(0.2)
+                                            pcall(function()
+                                                prompt.HoldDuration = 0
+                                                prompt.RequiresLineOfSight = false
+                                                prompt:InputBegan(player)
+                                            end)
+                                            task.wait(0.2)
+                                            root.CFrame = oldCFrame
+                                            task.wait(0.25)
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end)
+                if not success then
+                    warn("[PacksThread] Error: " .. tostring(err))
+                end
+            end
+            
+            task.wait(0.5)
+        end
+        packsThread = nil
+    end)
+end
+
 function startAutoCollectTokensLoop()
-    local anyActive = Config.AutoCollectTokens or Config.AutoCollectDragonBalls or Config.AutoWish or Config.AutoRollPets or Config.AutoRaid or Config.AutoVoyage or Config.AutoPetQuests or Config.AutoPackOpener or Config.AutoCook or Config.AutoUpgradeRod or Config.NotifyMerchant
+    local anyActive = Config.AutoCollectTokens or Config.AutoCollectDragonBalls or Config.AutoWish or Config.AutoRollPets or Config.AutoRaid or Config.AutoVoyage or Config.AutoPetQuests or Config.AutoCook or Config.AutoUpgradeRod or Config.NotifyMerchant
     if not anyActive then
         cancelCollectTokensThread()
         return
@@ -3849,253 +4010,6 @@ function startAutoCollectTokensLoop()
                 end
             end
             
-            -- Packs & Bundles Automation Loop
-            if Config.AutoPlacePacks or Config.AutoOpenPacks or Config.AutoUseHatchTime then
-                local now = os.time()
-                if not lastPackOpenerCheck or (now - lastPackOpenerCheck) >= 3 then
-                    lastPackOpenerCheck = now
-                    
-                    local success, err = pcall(function()
-                        local plotName = player:GetAttribute("Plot")
-                        local plot = workspace.Plots:FindFirstChild(plotName or "")
-                        if not plot then return end
-                        
-                        local packsPlaced = ReplicatedData.GetData("PacksPlaced") or {}
-                        local maxPlacements = math.min(Config.PlaceLimit or 72, ReplicatedData.GetData("MaxPlacements") or 72)
-                        
-                        local placedCount = 0
-                        for _ in pairs(packsPlaced) do
-                            placedCount = placedCount + 1
-                        end
-                        
-                        local ownedPacks = ReplicatedData.GetData("Packs") or {}
-                        local target = Config.AutoPackTarget
-                        
-                        -- Load Hina Hub selections if available
-                        local hinaSelections = getHinaSelections()
-                        local hasHinaSelections = false
-                        for _ in pairs(hinaSelections) do
-                            hasHinaSelections = true
-                            break
-                        end
-                        
-                        -- 1. Auto Place Packs
-                        if Config.AutoPlacePacks and placedCount < maxPlacements then
-                            -- Determine eligible packs in inventory
-                            local eligiblePacks = {}
-                            local totalEligibleCount = 0
-                            
-                            local matchedPacks = {}
-                            -- Search by Priority Slots (Slot 1 to 7)
-                            for _, priorityName in ipairs(Config.PrioritySlots) do
-                                if priorityName and priorityName ~= "" then
-                                    for pName, amt in pairs(ownedPacks) do
-                                        if amt > 0 and not matchedPacks[pName] and string.find(pName:lower(), priorityName:lower()) then
-                                            matchedPacks[pName] = true
-                                            table.insert(eligiblePacks, {name = pName, amount = amt})
-                                            totalEligibleCount = totalEligibleCount + amt
-                                        end
-                                    end
-                                end
-                            end
-                            
-                            -- If we have no priority packs, fall back to Hina Hub selections or manual target
-                            if totalEligibleCount == 0 then
-                                for pName, amt in pairs(ownedPacks) do
-                                    if amt > 0 then
-                                        local isMatch = false
-                                        if Config.SyncHinaHub and hasHinaSelections then
-                                            isMatch = hinaSelections[pName] == true
-                                        else
-                                            isMatch = Config.SelectedPacks[pName] == true
-                                        end
-                                        
-                                        if isMatch then
-                                            table.insert(eligiblePacks, {name = pName, amount = amt})
-                                            totalEligibleCount = totalEligibleCount + amt
-                                        end
-                                    end
-                                end
-                            end
-                            
-                            if totalEligibleCount > 0 then
-                                -- Check if legit walk is enabled (TPPlace is false)
-                                if not Config.TPPlace then
-                                    local floor = plot:FindFirstChild("Misc") and plot.Misc:FindFirstChild("Floor")
-                                    if floor then
-                                        setDebug("Auto-walking to plot floor base to place packs...")
-                                        walkTo(floor.Position)
-                                    end
-                                end
-                                
-                                setDebug(string.format("Placing packs... Current: %d/%d", placedCount, maxPlacements))
-                                local currentPackIdx = 1
-                                while placedCount < maxPlacements and currentPackIdx <= #eligiblePacks do
-                                    if not Config.AutoPlacePacks then break end
-                                    local pack = eligiblePacks[currentPackIdx]
-                                    if pack.amount > 0 then
-                                        ReplicatedStorage.Remotes.Card:FireServer("Hotbar", "1", pack.name)
-                                        task.wait(0.05)
-                                        ReplicatedStorage.Remotes.Card:FireServer("Place", pack.name)
-                                        pack.amount = pack.amount - 1
-                                        totalEligibleCount = totalEligibleCount - 1
-                                        placedCount = placedCount + 1
-                                        task.wait(0.15)
-                                    else
-                                        currentPackIdx = currentPackIdx + 1
-                                    end
-                                end
-                                task.wait(0.5)
-                            end
-                        end
-                        
-                        -- 2. Auto Apply Potions (Hatch Time)
-                        if Config.AutoUseHatchTime and plot:FindFirstChild("Packs") then
-                            local threshold = Config.UseWhenPackPlaced or 70
-                            -- We apply potions if we reached the threshold, or if we placed packs and have no more matching packs left in inventory
-                            local shouldApply = placedCount >= threshold or (placedCount > 0 and not Config.AutoPlacePacks)
-                            
-                            -- Count ready packs to check stop limit
-                            local readyCount = 0
-                            for _, pack in ipairs(plot.Packs:GetChildren()) do
-                                local prompt = pack:FindFirstChildWhichIsA("ProximityPrompt", true)
-                                if prompt and prompt.Enabled and prompt.ActionText == "Open Pack" then
-                                    readyCount = readyCount + 1
-                                end
-                            end
-                            
-                            if readyCount >= (Config.StopAtReadyCount or 1) then
-                                shouldApply = false
-                            end
-                            
-                            if shouldApply then
-                                local hasHatching = false
-                                for _, pack in ipairs(plot.Packs:GetChildren()) do
-                                    local prompt = pack:FindFirstChildWhichIsA("ProximityPrompt", true)
-                                    if prompt and prompt.Enabled and prompt.ActionText ~= "Open Pack" then
-                                        hasHatching = true
-                                        break
-                                    end
-                                end
-                                
-                                if hasHatching then
-                                    local consumables = ReplicatedData.GetData("Consumables") or {}
-                                    local ht3Uses, ht2Uses, ht1Uses = 0, 0, 0
-                                    
-                                    while hasHatching do
-                                        if not Config.AutoUseHatchTime then break end
-                                        
-                                        local targetPotion = nil
-                                        if (consumables.HatchTime3 or 0) > 0 and ht3Uses < (Config.HatchTime3MaxUses or 0) then
-                                            targetPotion = "HatchTime3"
-                                            consumables.HatchTime3 = consumables.HatchTime3 - 1
-                                            ht3Uses = ht3Uses + 1
-                                        elseif (consumables.HatchTime2 or 0) > 0 and ht2Uses < (Config.HatchTime2MaxUses or 0) then
-                                            targetPotion = "HatchTime2"
-                                            consumables.HatchTime2 = consumables.HatchTime2 - 1
-                                            ht2Uses = ht2Uses + 1
-                                        elseif (consumables.HatchTime1 or 0) > 0 and ht1Uses < (Config.HatchTime1MaxUses or 47) then
-                                            targetPotion = "HatchTime1"
-                                            consumables.HatchTime1 = consumables.HatchTime1 - 1
-                                            ht1Uses = ht1Uses + 1
-                                        end
-                                        
-                                        if not targetPotion then break end
-                                        
-                                        setDebug("Hatching: applying " .. targetPotion)
-                                        pcall(function() ReplicatedStorage.Remotes.Potion:FireServer("Apply", targetPotion) end)
-                                        task.wait(0.2)
-                                        
-                                        -- Re-evaluate ready packs
-                                        readyCount = 0
-                                        hasHatching = false
-                                        for _, pack in ipairs(plot.Packs:GetChildren()) do
-                                            local prompt = pack:FindFirstChildWhichIsA("ProximityPrompt", true)
-                                            if prompt and prompt.Enabled then
-                                                if prompt.ActionText == "Open Pack" then
-                                                    readyCount = readyCount + 1
-                                                else
-                                                    hasHatching = true
-                                                end
-                                            end
-                                        end
-                                        
-                                        if readyCount >= (Config.StopAtReadyCount or 1) then
-                                            break
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                        
-                        -- 3. Auto Open Packs
-                        if Config.AutoOpenPacks and plot:FindFirstChild("Packs") then
-                            local readyPacks = {}
-                            for _, pack in ipairs(plot.Packs:GetChildren()) do
-                                local prompt = pack:FindFirstChildWhichIsA("ProximityPrompt", true)
-                                if prompt and prompt.Enabled and prompt.ActionText == "Open Pack" then
-                                    table.insert(readyPacks, {model = pack, prompt = prompt})
-                                end
-                            end
-                            
-                            local targetReadyOpen = Config.NumReadyToOpen or 1
-                            if #readyPacks >= targetReadyOpen then
-                                local char = player.Character
-                                local root = char and char:FindFirstChild("HumanoidRootPart")
-                                
-                                for _, packData in ipairs(readyPacks) do
-                                    if not Config.AutoOpenPacks then break end
-                                    local pack = packData.model
-                                    local prompt = packData.prompt
-                                    
-                                    if prompt and prompt.Enabled and prompt.ActionText == "Open Pack" then
-                                        if not Config.TPCollect then
-                                            -- Legit walk normally to the ready card model
-                                            setDebug("Walking to open pack: " .. pack.Name)
-                                            walkTo(pack:GetPivot().Position)
-                                            pcall(function()
-                                                prompt.HoldDuration = 0
-                                                prompt.RequiresLineOfSight = false
-                                                if fireproximityprompt then
-                                                    fireproximityprompt(prompt)
-                                                else
-                                                    prompt:InputBegan(player)
-                                                end
-                                            end)
-                                            task.wait(0.3)
-                                        else
-                                            -- Teleport / Remote opening
-                                            if fireproximityprompt then
-                                                setDebug("Opening pack remotely: " .. pack.Name)
-                                                pcall(function()
-                                                    prompt.HoldDuration = 0
-                                                    prompt.RequiresLineOfSight = false
-                                                    fireproximityprompt(prompt)
-                                                end)
-                                                task.wait(0.08)
-                                            elseif root then
-                                                setDebug("Teleporting to open pack: " .. pack.Name)
-                                                local oldCFrame = root.CFrame
-                                                root.CFrame = pack:GetPivot()
-                                                task.wait(0.2)
-                                                pcall(function()
-                                                    prompt.HoldDuration = 0
-                                                    prompt.RequiresLineOfSight = false
-                                                    prompt:InputBegan(player)
-                                                end)
-                                                task.wait(0.2)
-                                                root.CFrame = oldCFrame
-                                                task.wait(0.25)
-                                            end
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                    end)
-                    if not success then
-                        warn("[PackOpener] Loop Error: " .. tostring(err))
-                    end
                 end
             end
             
@@ -5439,8 +5353,11 @@ end)
 showTab("Fishing")
 updateModeUI()
 updateGradingUI()
-if Config.AutoCollectTokens or Config.AutoCollectDragonBalls or Config.AutoRollPets or Config.AutoRaid or Config.AutoVoyage or Config.AutoWish or Config.AutoPetQuests or Config.AutoPackOpener then
+if Config.AutoCollectTokens or Config.AutoCollectDragonBalls or Config.AutoRollPets or Config.AutoRaid or Config.AutoVoyage or Config.AutoWish or Config.AutoPetQuests then
     startAutoCollectTokensLoop()
+end
+if Config.AutoPlacePacks or Config.AutoOpenPacks or Config.AutoUseHatchTime then
+    startPacksThread()
 end
 if Config.AutoBuyPacks then
     startAutoBuyPacksLoop()
