@@ -3132,13 +3132,14 @@ function startAutoCollectTokensLoop()
             -- Auto Pack Opener Loop
             if Config.AutoPackOpener then
                 local now = os.time()
-                if not lastPackOpenerCheck or (now - lastPackOpenerCheck) >= 8 then
+                if not lastPackOpenerCheck or (now - lastPackOpenerCheck) >= 4 then
                     lastPackOpenerCheck = now
-                    pcall(function()
+                    
+                    local success, err = pcall(function()
                         local packsPlaced = ReplicatedData.GetData("PacksPlaced") or {}
                         local maxPlacements = ReplicatedData.GetData("MaxPlacements") or 9
                         local placedCount = 0
-                        for _, pData in pairs(packsPlaced) do
+                        for _ in pairs(packsPlaced) do
                             placedCount = placedCount + 1
                         end
                         
@@ -3160,13 +3161,12 @@ function startAutoCollectTokensLoop()
                             if foundPack then
                                 setDebug("Auto-placing matching pack: " .. foundPack)
                                 ReplicatedStorage.Remotes.Card:FireServer("Hotbar", "1", foundPack)
-                                task.wait(0.2)
-                                ReplicatedStorage.Remotes.Card:FireServer("Equip", foundPack)
-                                task.wait(0.2)
-                                ReplicatedStorage.Remotes.Card:FireServer("Place", foundPack)
-                                task.wait(0.2)
-                                ReplicatedStorage.Remotes.Card:FireServer("Unequip", foundPack)
-                                task.wait(0.5)
+                                task.wait(0.15)
+                                -- Direct Place remote call spam to bypass lag
+                                for i = 1, 3 do
+                                    ReplicatedStorage.Remotes.Card:FireServer("Place", foundPack)
+                                    task.wait(0.05)
+                                end
                             end
                         end
                         
@@ -3198,40 +3198,50 @@ function startAutoCollectTokensLoop()
                                         
                                         setDebug("Hatching pack: applying " .. targetPotion)
                                         pcall(function() ReplicatedStorage.Remotes.Potion:FireServer("Apply", targetPotion) end)
-                                        task.wait(0.25)
+                                        task.wait(0.2)
                                     end
                                 end
                             end
                         end
                         
-                        -- 3. Teleport & Trigger ProximityPrompt for Ready Packs
+                        -- 3. Trigger ProximityPrompt for Ready Packs (Remotely if supported, otherwise teleport)
                         local char = player.Character
                         local root = char and char:FindFirstChild("HumanoidRootPart")
                         
-                        if plot and plot:FindFirstChild("Packs") and root then
+                        if plot and plot:FindFirstChild("Packs") then
                             for _, pack in ipairs(plot.Packs:GetChildren()) do
                                 local prompt = pack:FindFirstChildWhichIsA("ProximityPrompt", true)
                                 if prompt and prompt.Enabled and prompt.ActionText == "Open Pack" then
-                                    setDebug("Teleporting to open pack: " .. pack.Name)
-                                    local oldCFrame = root.CFrame
-                                    root.CFrame = pack:GetPivot()
-                                    task.wait(0.25)
-                                    pcall(function()
-                                        prompt.HoldDuration = 0
-                                        prompt.RequiresLineOfSight = false
-                                        if fireproximityprompt then
+                                    if fireproximityprompt then
+                                        setDebug("Opening pack remotely: " .. pack.Name)
+                                        pcall(function()
+                                            prompt.HoldDuration = 0
+                                            prompt.RequiresLineOfSight = false
                                             fireproximityprompt(prompt)
-                                        else
+                                        end)
+                                        task.wait(0.1)
+                                    elseif root then
+                                        setDebug("Teleporting to open pack: " .. pack.Name)
+                                        local oldCFrame = root.CFrame
+                                        root.CFrame = pack:GetPivot()
+                                        task.wait(0.25)
+                                        pcall(function()
+                                            prompt.HoldDuration = 0
+                                            prompt.RequiresLineOfSight = false
                                             prompt:InputBegan(player)
-                                        end
-                                    end)
-                                    task.wait(0.25)
-                                    root.CFrame = oldCFrame
-                                    task.wait(0.3)
+                                        end)
+                                        task.wait(0.25)
+                                        root.CFrame = oldCFrame
+                                        task.wait(0.3)
+                                    end
                                 end
                             end
                         end
                     end)
+                    if not success then
+                        warn("[PackOpener] Loop Error: " .. tostring(err))
+                    end
+                end
                 end
             end
             
