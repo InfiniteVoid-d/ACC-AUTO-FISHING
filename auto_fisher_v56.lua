@@ -3138,79 +3138,96 @@ function startAutoCollectTokensLoop()
                         local packsPlaced = ReplicatedData.GetData("PacksPlaced") or {}
                         local maxPlacements = ReplicatedData.GetData("MaxPlacements") or 9
                         local placedCount = 0
-                        local hasHatchingPacks = false
-                        
                         for _, pData in pairs(packsPlaced) do
                             placedCount = placedCount + 1
-                            local serverTime = workspace:GetServerTimeNow()
-                            if serverTime - pData.Time < pData.HatchTime then
-                                hasHatchingPacks = true
-                            end
                         end
                         
-                        -- 1. Auto Place Packs if space remains
+                        -- 1. Auto Place Packs if space remains (supports dynamic matching for bundles and pack variants)
                         if placedCount < maxPlacements then
                             local ownedPacks = ReplicatedData.GetData("Packs") or {}
                             local target = Config.AutoPackTarget
-                            if (ownedPacks[target] or 0) > 0 then
-                                setDebug("Auto-placing target pack: " .. target)
-                                ReplicatedStorage.Remotes.Card:FireServer("Hotbar", "1", target)
+                            
+                            local foundPack = nil
+                            for pName, amt in pairs(ownedPacks) do
+                                if amt > 0 then
+                                    if target:lower() == "all" or string.find(pName:lower(), target:lower()) then
+                                        foundPack = pName
+                                        break
+                                    end
+                                end
+                            end
+                            
+                            if foundPack then
+                                setDebug("Auto-placing matching pack: " .. foundPack)
+                                ReplicatedStorage.Remotes.Card:FireServer("Hotbar", "1", foundPack)
                                 task.wait(0.2)
-                                ReplicatedStorage.Remotes.Card:FireServer("Equip", target)
+                                ReplicatedStorage.Remotes.Card:FireServer("Equip", foundPack)
                                 task.wait(0.2)
-                                ReplicatedStorage.Remotes.Card:FireServer("Place", target)
+                                ReplicatedStorage.Remotes.Card:FireServer("Place", foundPack)
                                 task.wait(0.2)
-                                ReplicatedStorage.Remotes.Card:FireServer("Unequip", target)
+                                ReplicatedStorage.Remotes.Card:FireServer("Unequip", foundPack)
                                 task.wait(0.5)
                             end
                         end
                         
-                        -- 2. Auto Apply Potions if enabled
-                        if Config.AutoApplyHatchPotions and hasHatchingPacks then
-                            local consumables = ReplicatedData.GetData("Consumables") or {}
-                            local targetPotion = nil
-                            if (consumables.HatchTime3 or 0) > 0 then
-                                targetPotion = "HatchTime3"
-                            elseif (consumables.HatchTime2 or 0) > 0 then
-                                targetPotion = "HatchTime2"
-                            elseif (consumables.HatchTime1 or 0) > 0 then
-                                targetPotion = "HatchTime1"
-                            end
-                            
-                            if targetPotion then
-                                setDebug("Auto-applying Hatch Potion: " .. targetPotion)
-                                ReplicatedStorage.Remotes.Potion:FireServer("Apply", targetPotion)
-                                task.wait(0.5)
+                        -- 2. Auto Apply Potions continuously until packs are ready
+                        local plotName = player:GetAttribute("Plot")
+                        local plot = workspace.Plots:FindFirstChild(plotName or "")
+                        
+                        if plot and plot:FindFirstChild("Packs") and Config.AutoApplyHatchPotions then
+                            for _, pack in ipairs(plot.Packs:GetChildren()) do
+                                local prompt = pack:FindFirstChildWhichIsA("ProximityPrompt", true)
+                                if prompt and prompt.Enabled and prompt.ActionText ~= "Open Pack" then
+                                    local consumables = ReplicatedData.GetData("Consumables") or {}
+                                    while prompt and prompt.Parent and prompt.ActionText ~= "Open Pack" do
+                                        if not Config.AutoApplyHatchPotions or not Config.AutoPackOpener then break end
+                                        
+                                        local targetPotion = nil
+                                        if (consumables.HatchTime3 or 0) > 0 then
+                                            targetPotion = "HatchTime3"
+                                            consumables.HatchTime3 = consumables.HatchTime3 - 1
+                                        elseif (consumables.HatchTime2 or 0) > 0 then
+                                            targetPotion = "HatchTime2"
+                                            consumables.HatchTime2 = consumables.HatchTime2 - 1
+                                        elseif (consumables.HatchTime1 or 0) > 0 then
+                                            targetPotion = "HatchTime1"
+                                            consumables.HatchTime1 = consumables.HatchTime1 - 1
+                                        end
+                                        
+                                        if not targetPotion then break end
+                                        
+                                        setDebug("Hatching pack: applying " .. targetPotion)
+                                        pcall(function() ReplicatedStorage.Remotes.Potion:FireServer("Apply", targetPotion) end)
+                                        task.wait(0.25)
+                                    end
+                                end
                             end
                         end
                         
                         -- 3. Teleport & Trigger ProximityPrompt for Ready Packs
-                        local plotName = player:GetAttribute("Plot")
-                        local plot = workspace.Plots:FindFirstChild(plotName or "")
                         local char = player.Character
                         local root = char and char:FindFirstChild("HumanoidRootPart")
                         
                         if plot and plot:FindFirstChild("Packs") and root then
                             for _, pack in ipairs(plot.Packs:GetChildren()) do
-                                for _, prompt in ipairs(pack:GetDescendants()) do
-                                    if prompt:IsA("ProximityPrompt") and prompt.Enabled and prompt.ActionText == "Open Pack" then
-                                        setDebug("Teleporting to open pack: " .. pack.Name)
-                                        local oldCFrame = root.CFrame
-                                        root.CFrame = pack:GetPivot()
-                                        task.wait(0.25)
-                                        pcall(function()
-                                            prompt.HoldDuration = 0
-                                            prompt.RequiresLineOfSight = false
-                                            if fireproximityprompt then
-                                                fireproximityprompt(prompt)
-                                            else
-                                                prompt:InputBegan(player)
-                                            end
-                                        end)
-                                        task.wait(0.25)
-                                        root.CFrame = oldCFrame
-                                        task.wait(0.3)
-                                    end
+                                local prompt = pack:FindFirstChildWhichIsA("ProximityPrompt", true)
+                                if prompt and prompt.Enabled and prompt.ActionText == "Open Pack" then
+                                    setDebug("Teleporting to open pack: " .. pack.Name)
+                                    local oldCFrame = root.CFrame
+                                    root.CFrame = pack:GetPivot()
+                                    task.wait(0.25)
+                                    pcall(function()
+                                        prompt.HoldDuration = 0
+                                        prompt.RequiresLineOfSight = false
+                                        if fireproximityprompt then
+                                            fireproximityprompt(prompt)
+                                        else
+                                            prompt:InputBegan(player)
+                                        end
+                                    end)
+                                    task.wait(0.25)
+                                    root.CFrame = oldCFrame
+                                    task.wait(0.3)
                                 end
                             end
                         end
