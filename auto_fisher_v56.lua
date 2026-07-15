@@ -4757,11 +4757,18 @@ function sellDuplicates()
     for _, fishData in ipairs(fishList) do
         if not Config.AutoSellDupes or not autoFishing then break end
 
+        -- Get base name (excludes mutation suffix like -Gold)
+        local baseName = fishData.name
+        local hyphenIdx = fishData.name:find("-")
+        if hyphenIdx then
+            baseName = fishData.name:sub(1, hyphenIdx - 1)
+        end
+
         local protect = false
-        if Config.ProtectCookingIngredients and cookReq[fishData.name] then
+        if Config.ProtectCookingIngredients and cookReq[baseName] then
             protect = true
         end
-        if Config.ProtectRodIngredients and rodReq[fishData.name] then
+        if Config.ProtectRodIngredients and rodReq[baseName] then
             protect = true
         end
 
