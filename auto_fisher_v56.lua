@@ -617,7 +617,7 @@ automationTab.Position = UDim2.new(0, 10, 0, 10)
 automationTab.BackgroundTransparency = 1
 automationTab.BorderSizePixel = 0
 automationTab.ScrollBarThickness = 4
-automationTab.CanvasSize = UDim2.new(0, 0, 0, 1270)
+automationTab.CanvasSize = UDim2.new(0, 0, 0, 1330)
 automationTab.Parent = mainPanel
 tabFrames["Automation"] = automationTab
 
@@ -2489,7 +2489,7 @@ end)
 end -- end discord card scope block
 
 do -- scope block for Mutation UI
-local mutateCard = createCard(automationTab, "FISH MUTATION AUTOMATION", UDim2.new(1, -10, 0, 160), UDim2.new(0, 0, 0, 1098))
+local mutateCard = createCard(automationTab, "FISH MUTATION AUTOMATION", UDim2.new(1, -10, 0, 215), UDim2.new(0, 0, 0, 1098))
 
 createGridToggle(mutateCard, "🧬 Auto Upgrade Mutator", UDim2.new(0, 0, 0, 20), UDim2.new(1, 0, 0, 18), Config.AutoMutateUpgrade, function(val)
     Config.AutoMutateUpgrade = val
@@ -2524,6 +2524,37 @@ fishConfigFrame.Position = UDim2.new(0, 0, 0, 105)
 fishConfigFrame.BackgroundTransparency = 1
 fishConfigFrame.Parent = mutateCard
 
+-- Selected Fish Status List Display
+local listLabel = Instance.new("TextLabel")
+listLabel.Size = UDim2.new(1, -16, 0, 45)
+listLabel.Position = UDim2.new(0, 8, 0, 155)
+listLabel.BackgroundTransparency = 1
+listLabel.TextColor3 = Color3.fromRGB(150, 155, 170)
+listLabel.TextSize = 8
+listLabel.Font = Enum.Font.Gotham
+listLabel.TextXAlignment = Enum.TextXAlignment.Left
+listLabel.TextYAlignment = Enum.TextYAlignment.Top
+listLabel.TextWrapped = true
+listLabel.Parent = mutateCard
+
+local function updateSelectedListText()
+    local ups = {}
+    local downs = {}
+    for fName, val in pairs(Config.SelectedUpgradeFish) do
+        if val == true then table.insert(ups, fName) end
+    end
+    for fName, val in pairs(Config.SelectedDowngradeFish) do
+        if val == true then table.insert(downs, fName) end
+    end
+    table.sort(ups)
+    table.sort(downs)
+    
+    local upStr = #ups > 0 and table.concat(ups, ", ") or "None"
+    local downStr = #downs > 0 and table.concat(downs, ", ") or "None"
+    
+    listLabel.Text = "📈 Auto-Upgrade: " .. upStr .. "\n📉 Auto-Downgrade: " .. downStr
+end
+
 local upToggle = nil
 local downToggle = nil
 
@@ -2536,10 +2567,12 @@ local function updateTogglesForActiveFish()
     
     upToggle = createGridToggle(fishConfigFrame, "⭐ Auto-Upgrade " .. activeFish, UDim2.new(0, 0, 0, 0), UDim2.new(1, 0, 0, 18), upVal, function(val)
         Config.SelectedUpgradeFish[activeFish] = val
+        updateSelectedListText()
     end)
     
     downToggle = createGridToggle(fishConfigFrame, "⭐ Auto-Downgrade " .. activeFish, UDim2.new(0, 0, 0, 22), UDim2.new(1, 0, 0, 18), downVal, function(val)
         Config.SelectedDowngradeFish[activeFish] = val
+        updateSelectedListText()
     end)
 end
 
@@ -2549,11 +2582,12 @@ createSearchableDropdown(mutateCard, "🐟 Select Fish to Configure:", UDim2.new
 end)
 
 updateTogglesForActiveFish()
+updateSelectedListText()
 end -- end mutation card scope block
 
 -- Track the dynamic content size to expand scroll height if items change
 automationTab:GetPropertyChangedSignal("AbsoluteWindowSize"):Connect(function()
-    automationTab.CanvasSize = UDim2.new(0, 0, 0, 1270)
+    automationTab.CanvasSize = UDim2.new(0, 0, 0, 1330)
 end)
 
 
