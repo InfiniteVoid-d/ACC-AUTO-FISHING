@@ -536,7 +536,8 @@ end
 -- Create Tab Buttons
 createTabButton("Fishing", "🎣", 1)
 createTabButton("Conveyor", "📦", 2)
-createTabButton("Automation", "🏺", 3)
+createTabButton("Packs/Bundles", "🎁", 3)
+createTabButton("Automation", "🏺", 4)
 
 -- Create Tab Panel Frames
 local fishingTab = Instance.new("ScrollingFrame")
@@ -560,6 +561,17 @@ conveyorTab.Visible = false
 conveyorTab.Parent = mainPanel
 tabFrames["Conveyor"] = conveyorTab
 
+local packTab = Instance.new("ScrollingFrame")
+packTab.Size = UDim2.new(1, -20, 1, -20)
+packTab.Position = UDim2.new(0, 10, 0, 10)
+packTab.BackgroundTransparency = 1
+packTab.BorderSizePixel = 0
+packTab.ScrollBarThickness = 4
+packTab.CanvasSize = UDim2.new(0, 0, 0, 400)
+packTab.Visible = false
+packTab.Parent = mainPanel
+tabFrames["Packs/Bundles"] = packTab
+
 -- Convert Automation Tab to ScrollingFrame for extended layout
 local automationTab = Instance.new("ScrollingFrame")
 automationTab.Size = UDim2.new(1, -20, 1, -20)
@@ -567,7 +579,7 @@ automationTab.Position = UDim2.new(0, 10, 0, 10)
 automationTab.BackgroundTransparency = 1
 automationTab.BorderSizePixel = 0
 automationTab.ScrollBarThickness = 4
-automationTab.CanvasSize = UDim2.new(0, 0, 0, 1228)
+automationTab.CanvasSize = UDim2.new(0, 0, 0, 1110)
 automationTab.Parent = mainPanel
 tabFrames["Automation"] = automationTab
 
@@ -1307,9 +1319,9 @@ createGridToggle(petEggCard, "🐾 Auto Pet Quests", UDim2.new(0, 0, 0, 94), UDi
 end)
 
 -- =============================================
--- AUTO PACK OPENER CARD (Y = 326, Height 160)
+-- AUTO PACK OPENER CARD (Y = 0, Height 200)
 -- =============================================
-local packOpenerCard = createCard(automationTab, "AUTO PACK OPENER", UDim2.new(1, -10, 0, 160), UDim2.new(0, 0, 0, 381))
+local packOpenerCard = createCard(packTab, "AUTO PACK OPENER", UDim2.new(1, 0, 0, 200), UDim2.new(0, 0, 0, 0))
 
 createGridToggle(packOpenerCard, "📦 Auto Place/Open Packs", UDim2.new(0, 0, 0, 20), UDim2.new(1, 0, 0, 18), Config.AutoPackOpener, function(val)
     Config.AutoPackOpener = val
@@ -1488,7 +1500,7 @@ end)
 -- =============================================
 -- COOKING & ROD AUTOMATION CARD (Y = 463, Height 95)
 -- =============================================
-local cookCard = createCard(automationTab, "COOKING & ROD AUTOMATION", UDim2.new(1, -10, 0, 95), UDim2.new(0, 0, 0, 546))
+local cookCard = createCard(automationTab, "COOKING & ROD AUTOMATION", UDim2.new(1, -10, 0, 95), UDim2.new(0, 0, 0, 381))
 
 createGridToggle(cookCard, "🍳 Auto Cooking Manager", UDim2.new(0, 0, 0, 20), UDim2.new(1, 0, 0, 18), Config.AutoCook, function(val)
     Config.AutoCook = val
@@ -1554,7 +1566,7 @@ end)
 -- AUTO RAID CARD (Y = 563, Height 130)
 -- =============================================
 do -- scope block to reduce top-level local register count
-local raidCard = createCard(automationTab, "AUTO RAID AUTOMATION", UDim2.new(1, -10, 0, 130), UDim2.new(0, 0, 0, 581))
+local raidCard = createCard(automationTab, "AUTO RAID AUTOMATION", UDim2.new(1, -10, 0, 130), UDim2.new(0, 0, 0, 481))
 
 
 createGridToggle(raidCard, "⚔️ Auto Join/Start Raids", UDim2.new(0, 0, 0, 20), UDim2.new(1, 0, 0, 18), Config.AutoRaid, function(val)
@@ -1683,7 +1695,7 @@ end -- end promo code scope block
 -- AUTO CARD GRADING CARD (Y = 728)
 -- =============================================
 do -- scope block for grading card UI
-gradingCard = createCard(automationTab, "AUTO CARD GRADING", UDim2.new(1, -10, 0, 180), UDim2.new(0, 0, 0, 746))
+gradingCard = createCard(automationTab, "AUTO CARD GRADING", UDim2.new(1, -10, 0, 180), UDim2.new(0, 0, 0, 621))
 
 -- Grading Mode Row
 local modeRow = Instance.new("Frame")
@@ -1826,7 +1838,7 @@ end -- end grading card scope block
 -- AUTO VOYAGE CARD (Y = 660, Height 110)
 -- =============================================
 do -- scope block for Voyage UI
-local voyageCard = createCard(automationTab, "AUTO VOYAGE AUTOMATION", UDim2.new(1, -10, 0, 110), UDim2.new(0, 0, 0, 931))
+local voyageCard = createCard(automationTab, "AUTO VOYAGE AUTOMATION", UDim2.new(1, -10, 0, 110), UDim2.new(0, 0, 0, 811))
 
 createGridToggle(voyageCard, "⚓ Auto Voyages", UDim2.new(0, 0, 0, 20), UDim2.new(1, 0, 0, 18), Config.AutoVoyage, function(val)
     Config.AutoVoyage = val
@@ -1878,7 +1890,7 @@ updateVoyagePackUI()
 end -- end voyage card scope block
 
 do -- scope block for Discord Webhook UI
-local discordCard = createCard(automationTab, "DISCORD NOTIFICATIONS", UDim2.new(1, -10, 0, 165), UDim2.new(0, 0, 0, 1048))
+local discordCard = createCard(automationTab, "DISCORD NOTIFICATIONS", UDim2.new(1, -10, 0, 165), UDim2.new(0, 0, 0, 928))
 
 -- Webhook URL TextBox
 local urlFrame = Instance.new("Frame")
