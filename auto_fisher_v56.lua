@@ -2489,7 +2489,7 @@ end)
 end -- end discord card scope block
 
 do -- scope block for Mutation UI
-local mutateCard = createCard(automationTab, "FISH MUTATION AUTOMATION", UDim2.new(1, -10, 0, 215), UDim2.new(0, 0, 0, 1098))
+local mutateCard = createCard(automationTab, "FISH MUTATION AUTOMATION", UDim2.new(1, -10, 0, 230), UDim2.new(0, 0, 0, 1098))
 
 createGridToggle(mutateCard, "🧬 Auto Upgrade Mutator", UDim2.new(0, 0, 0, 20), UDim2.new(1, 0, 0, 18), Config.AutoMutateUpgrade, function(val)
     Config.AutoMutateUpgrade = val
@@ -2501,17 +2501,12 @@ createGridToggle(mutateCard, "🧬 Auto Downgrade Mutator", UDim2.new(0, 0, 0, 4
     if val then startMutationThread() end
 end)
 
--- Dropdown to configure a fish (combines fish names with mutation states)
+-- Dropdown to configure a fish species
 local fishNames = {}
 pcall(function()
     local FishConfig = require(ReplicatedStorage.Modules.Config.Core.FishConfig)
     for fName, _ in pairs(FishConfig.Fish) do
-        table.insert(fishNames, fName) -- Regular
-        table.insert(fishNames, fName .. "-Gold")
-        table.insert(fishNames, fName .. "-Emerald")
-        table.insert(fishNames, fName .. "-Void")
-        table.insert(fishNames, fName .. "-Diamond")
-        table.insert(fishNames, fName .. "-Rainbow")
+        table.insert(fishNames, fName)
     end
 end)
 table.sort(fishNames)
@@ -2522,17 +2517,20 @@ end
 
 local activeFish = fishNames[1] or "Tilapia"
 
--- Sub-panel container for the selected fish settings
-local fishConfigFrame = Instance.new("Frame")
-fishConfigFrame.Size = UDim2.new(1, -16, 0, 45)
-fishConfigFrame.Position = UDim2.new(0, 0, 0, 105)
-fishConfigFrame.BackgroundTransparency = 1
-fishConfigFrame.Parent = mutateCard
+-- Mutations scroll selector parented to card
+local mutationsScroll = Instance.new("ScrollingFrame")
+mutationsScroll.Size = UDim2.new(1, -16, 0, 80)
+mutationsScroll.Position = UDim2.new(0, 8, 0, 88)
+mutationsScroll.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+mutationsScroll.BorderSizePixel = 0
+mutationsScroll.ScrollBarThickness = 4
+mutationsScroll.Parent = mutateCard
+Instance.new("UICorner", mutationsScroll).CornerRadius = UDim.new(0, 4)
 
 -- Selected Fish Status List Display
 local listLabel = Instance.new("TextLabel")
 listLabel.Size = UDim2.new(1, -16, 0, 45)
-listLabel.Position = UDim2.new(0, 8, 0, 155)
+listLabel.Position = UDim2.new(0, 8, 0, 175)
 listLabel.BackgroundTransparency = 1
 listLabel.TextColor3 = Color3.fromRGB(150, 155, 170)
 listLabel.TextSize = 8
@@ -2560,43 +2558,116 @@ local function updateSelectedListText()
     listLabel.Text = "📈 Auto-Upgrade: " .. upStr .. "\n📉 Auto-Downgrade: " .. downStr
 end
 
-local upToggle = nil
-local downToggle = nil
-
-local function updateTogglesForActiveFish()
-    if upToggle and upToggle.Parent then upToggle.Parent:Destroy() end
-    if downToggle and downToggle.Parent then downToggle.Parent:Destroy() end
+local function populateMutations()
+    mutationsScroll:ClearAllChildren()
     
-    local hasHyphen = activeFish:find("-") ~= nil
-    local isRainbow = activeFish:find("-Rainbow") ~= nil
+    local baseName = activeFish
+    local states = {
+        { name = baseName, canUp = true, canDown = false },
+        { name = baseName .. "-Gold", canUp = true, canDown = true },
+        { name = baseName .. "-Emerald", canUp = true, canDown = true },
+        { name = baseName .. "-Void", canUp = true, canDown = true },
+        { name = baseName .. "-Diamond", canUp = true, canDown = true },
+        { name = baseName .. "-Rainbow", canUp = false, canDown = true }
+    }
     
-    local upVal = Config.SelectedUpgradeFish[activeFish] == true
-    local downVal = Config.SelectedDowngradeFish[activeFish] == true
-    
-    -- Show Upgrade toggle if NOT Rainbow
-    if not isRainbow then
-        upToggle = createGridToggle(fishConfigFrame, "⭐ Auto-Upgrade " .. activeFish, UDim2.new(0, 0, 0, 0), UDim2.new(1, 0, 0, 18), upVal, function(val)
-            Config.SelectedUpgradeFish[activeFish] = val
-            updateSelectedListText()
-        end)
+    local yPos = 4
+    for _, stateInfo in ipairs(states) do
+        local fullName = stateInfo.name
+        
+        local row = Instance.new("Frame")
+        row.Size = UDim2.new(1, -8, 0, 20)
+        row.Position = UDim2.new(0, 4, 0, yPos)
+        row.BackgroundTransparency = 1
+        row.Parent = mutationsScroll
+        
+        -- Label
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(0.5, 0, 1, 0)
+        label.Position = UDim2.new(0, 4, 0, 0)
+        label.BackgroundTransparency = 1
+        label.Text = fullName
+        label.TextColor3 = Color3.fromRGB(200, 200, 210)
+        label.TextSize = 8
+        label.TextXAlignment = Enum.TextXAlignment.Left
+        label.Font = Enum.Font.Gotham
+        label.Parent = row
+        
+        -- Upgrade Checkbox (60% width)
+        if stateInfo.canUp then
+            local upBox = Instance.new("TextButton")
+            upBox.Size = UDim2.new(0, 12, 0, 12)
+            upBox.Position = UDim2.new(0.6, 0, 0.5, -6)
+            upBox.BackgroundColor3 = Config.SelectedUpgradeFish[fullName] and Color3.fromRGB(0, 180, 90) or Color3.fromRGB(35, 35, 40)
+            upBox.Text = Config.SelectedUpgradeFish[fullName] and "✓" or ""
+            upBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+            upBox.TextSize = 8
+            upBox.Font = Enum.Font.GothamBold
+            upBox.Parent = row
+            Instance.new("UICorner", upBox).CornerRadius = UDim.new(0, 2)
+            
+            local upLbl = Instance.new("TextLabel")
+            upLbl.Size = UDim2.new(0, 20, 1, 0)
+            upLbl.Position = UDim2.new(0.6, 16, 0, 0)
+            upLbl.BackgroundTransparency = 1
+            upLbl.Text = "Up"
+            upLbl.TextColor3 = Color3.fromRGB(150, 150, 160)
+            upLbl.TextSize = 8
+            upLbl.TextXAlignment = Enum.TextXAlignment.Left
+            upLbl.Font = Enum.Font.Gotham
+            upLbl.Parent = row
+            
+            upBox.MouseButton1Click:Connect(function()
+                Config.SelectedUpgradeFish[fullName] = not Config.SelectedUpgradeFish[fullName]
+                upBox.BackgroundColor3 = Config.SelectedUpgradeFish[fullName] and Color3.fromRGB(0, 180, 90) or Color3.fromRGB(35, 35, 40)
+                upBox.Text = Config.SelectedUpgradeFish[fullName] and "✓" or ""
+                updateSelectedListText()
+            end)
+        end
+        
+        -- Downgrade Checkbox (80% width)
+        if stateInfo.canDown then
+            local downBox = Instance.new("TextButton")
+            downBox.Size = UDim2.new(0, 12, 0, 12)
+            downBox.Position = UDim2.new(0.8, 0, 0.5, -6)
+            downBox.BackgroundColor3 = Config.SelectedDowngradeFish[fullName] and Color3.fromRGB(0, 180, 90) or Color3.fromRGB(35, 35, 40)
+            downBox.Text = Config.SelectedDowngradeFish[fullName] and "✓" or ""
+            downBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+            downBox.TextSize = 8
+            downBox.Font = Enum.Font.GothamBold
+            downBox.Parent = row
+            Instance.new("UICorner", downBox).CornerRadius = UDim.new(0, 2)
+            
+            local downLbl = Instance.new("TextLabel")
+            downLbl.Size = UDim2.new(0, 25, 1, 0)
+            downLbl.Position = UDim2.new(0.8, 16, 0, 0)
+            downLbl.BackgroundTransparency = 1
+            downLbl.Text = "Down"
+            downLbl.TextColor3 = Color3.fromRGB(150, 150, 160)
+            downLbl.TextSize = 8
+            downLbl.TextXAlignment = Enum.TextXAlignment.Left
+            downLbl.Font = Enum.Font.Gotham
+            downLbl.Parent = row
+            
+            downBox.MouseButton1Click:Connect(function()
+                Config.SelectedDowngradeFish[fullName] = not Config.SelectedDowngradeFish[fullName]
+                downBox.BackgroundColor3 = Config.SelectedDowngradeFish[fullName] and Color3.fromRGB(0, 180, 90) or Color3.fromRGB(35, 35, 40)
+                downBox.Text = Config.SelectedDowngradeFish[fullName] and "✓" or ""
+                updateSelectedListText()
+            end)
+        end
+        
+        yPos = yPos + 22
     end
-    
-    -- Show Downgrade toggle if hasHyphen (meaning it's mutated)
-    if hasHyphen then
-        local pos = isRainbow and UDim2.new(0, 0, 0, 0) or UDim2.new(0, 0, 0, 22)
-        downToggle = createGridToggle(fishConfigFrame, "⭐ Auto-Downgrade " .. activeFish, pos, UDim2.new(1, 0, 0, 18), downVal, function(val)
-            Config.SelectedDowngradeFish[activeFish] = val
-            updateSelectedListText()
-        end)
-    end
+    mutationsScroll.CanvasSize = UDim2.new(0, 0, 0, yPos)
 end
 
 createSearchableDropdown(mutateCard, "🐟 Select Fish to Configure:", UDim2.new(0, 0, 0, 64), UDim2.new(1, -16, 0, 20), fishNames, activeFish, function(val)
     activeFish = val
-    updateTogglesForActiveFish()
+    populateMutations()
 end)
 
-updateTogglesForActiveFish()
+populateMutations()
 updateSelectedListText()
 end -- end mutation card scope block
 
