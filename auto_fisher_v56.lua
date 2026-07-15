@@ -4010,9 +4010,6 @@ function startAutoCollectTokensLoop()
                 end
             end
             
-                end
-            end
-            
             -- Auto Cooking Check
             if Config.AutoCook then
                 local now = os.time()
