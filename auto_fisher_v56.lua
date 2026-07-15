@@ -125,6 +125,8 @@ Config = {
     SyncHinaHub = true,
     PrioritySlots = {"", "", "", "", "", "", ""},
     AutoPackTarget = "Ghoul",
+    SelectedPacks = {},
+    ActiveGenre = "Shadow",
     
     -- Auto Cook & Rod Settings
     AutoCook = false,
@@ -206,6 +208,11 @@ function loadSettings()
                     if type(v) == "table" and k == "SelectedItems" then
                         for key, val in pairs(v) do
                             Config.SelectedItems[key] = val
+                        end
+                    elseif type(v) == "table" and k == "SelectedPacks" then
+                        Config.SelectedPacks = Config.SelectedPacks or {}
+                        for key, val in pairs(v) do
+                            Config.SelectedPacks[key] = val
                         end
                     elseif Config[k] ~= nil then
                         Config[k] = v
@@ -576,7 +583,7 @@ packTab.Position = UDim2.new(0, 10, 0, 10)
 packTab.BackgroundTransparency = 1
 packTab.BorderSizePixel = 0
 packTab.ScrollBarThickness = 4
-packTab.CanvasSize = UDim2.new(0, 0, 0, 680)
+packTab.CanvasSize = UDim2.new(0, 0, 0, 960)
 packTab.Visible = false
 packTab.Parent = mainPanel
 tabFrames["Packs/Bundles"] = packTab
@@ -659,6 +666,116 @@ local function createDropdown(parent, labelText, position, size, options, defaul
     
     btn.MouseButton1Click:Connect(function()
         listFrame.Visible = not listFrame.Visible
+    end)
+    
+    return frame
+end
+
+local function createSearchableDropdown(parent, labelText, position, size, options, defaultVal, callback)
+    local frame = Instance.new("Frame")
+    frame.Size = size
+    frame.Position = position
+    frame.BackgroundTransparency = 1
+    frame.Parent = parent
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -125, 1, 0)
+    label.Position = UDim2.new(0, 8, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = labelText
+    label.TextColor3 = Color3.fromRGB(200, 200, 210)
+    label.TextSize = 10
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Font = Enum.Font.Gotham
+    label.Parent = frame
+    
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 115, 0, 16)
+    btn.Position = UDim2.new(1, -115, 0.5, -8)
+    btn.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Text = defaultVal
+    btn.TextSize = 10
+    btn.Font = Enum.Font.GothamBold
+    btn.Parent = frame
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+    
+    local dropdownContainer = Instance.new("Frame")
+    dropdownContainer.Size = UDim2.new(0, 115, 0, 180)
+    dropdownContainer.Position = UDim2.new(1, -115, 0, 20)
+    dropdownContainer.BackgroundColor3 = Color3.fromRGB(24, 24, 28)
+    dropdownContainer.BorderSizePixel = 0
+    dropdownContainer.Visible = false
+    dropdownContainer.ZIndex = 100
+    dropdownContainer.Parent = frame
+    Instance.new("UICorner", dropdownContainer).CornerRadius = UDim.new(0, 6)
+    Instance.new("UIStroke", dropdownContainer).Color = Color3.fromRGB(50, 50, 60)
+    
+    local searchBar = Instance.new("TextBox")
+    searchBar.Size = UDim2.new(1, -8, 0, 20)
+    searchBar.Position = UDim2.new(0, 4, 0, 4)
+    searchBar.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
+    searchBar.TextColor3 = Color3.fromRGB(255, 255, 255)
+    searchBar.PlaceholderText = "Search..."
+    searchBar.Text = ""
+    searchBar.TextSize = 9
+    searchBar.Font = Enum.Font.Gotham
+    searchBar.ClearTextOnFocus = false
+    searchBar.ZIndex = 101
+    searchBar.Parent = dropdownContainer
+    Instance.new("UICorner", searchBar).CornerRadius = UDim.new(0, 4)
+    
+    local listFrame = Instance.new("ScrollingFrame")
+    listFrame.Size = UDim2.new(1, -8, 1, -32)
+    listFrame.Position = UDim2.new(0, 4, 0, 28)
+    listFrame.BackgroundTransparency = 1
+    listFrame.BorderSizePixel = 0
+    listFrame.ScrollBarThickness = 3
+    listFrame.ZIndex = 101
+    listFrame.Parent = dropdownContainer
+    
+    local function populateList(filterText)
+        listFrame:ClearAllChildren()
+        local yOffset = 0
+        for _, opt in ipairs(options) do
+            if filterText == "" or string.find(opt:lower(), filterText:lower()) then
+                local optBtn = Instance.new("TextButton")
+                optBtn.Size = UDim2.new(1, 0, 0, 20)
+                optBtn.Position = UDim2.new(0, 0, 0, yOffset)
+                optBtn.BackgroundColor3 = Color3.fromRGB(24, 24, 28)
+                optBtn.BorderSizePixel = 0
+                optBtn.Text = opt
+                optBtn.TextColor3 = Color3.fromRGB(200, 200, 210)
+                optBtn.TextSize = 9
+                optBtn.Font = Enum.Font.Gotham
+                optBtn.ZIndex = 102
+                optBtn.Parent = listFrame
+                
+                optBtn.MouseButton1Click:Connect(function()
+                    btn.Text = opt
+                    dropdownContainer.Visible = false
+                    callback(opt)
+                end)
+                
+                yOffset = yOffset + 20
+            end
+        end
+        listFrame.CanvasSize = UDim2.new(0, 0, 0, yOffset)
+    end
+    
+    populateList("")
+    
+    searchBar:GetPropertyChangedSignal("Text"):Connect(function()
+        populateList(searchBar.Text)
+    end)
+    
+    btn.MouseButton1Click:Connect(function()
+        dropdownContainer.Visible = not dropdownContainer.Visible
+        if dropdownContainer.Visible then
+            searchBar.Text = ""
+            searchBar:CaptureFocus()
+            populateList("")
+        end
     end)
     
     return frame
@@ -1508,8 +1625,144 @@ do
         setDebug("Fallback pack target set to: " .. val)
     end)
 
-    -- Card 2: AUTO HATCH TIME CONTROL
-    local hatchCard = createCard(packTab, "AUTO HATCH TIME CONTROL", UDim2.new(1, 0, 0, 155), UDim2.new(0, 0, 0, 180))
+    -- Card 1.5: GENRE CONFIGURATOR (Height: 290, Y: 180)
+    local genreCard = createCard(packTab, "GENRE CONFIGURATOR", UDim2.new(1, 0, 0, 290), UDim2.new(0, 0, 0, 180))
+    
+    local sortedPacks = {}
+    pcall(function()
+        local CardConfig = require(game:GetService("ReplicatedStorage").Modules.Config.Core.CardConfig)
+        local temp = {}
+        for k, v in pairs(CardConfig.Packs) do
+            table.insert(temp, k)
+        end
+        table.sort(temp)
+        if #temp > 0 then sortedPacks = temp end
+    end)
+    
+    local subPanel = Instance.new("Frame")
+    subPanel.Size = UDim2.new(1, -16, 0, 215)
+    subPanel.Position = UDim2.new(0, 8, 0, 68)
+    subPanel.BackgroundColor3 = Color3.fromRGB(20, 20, 24)
+    subPanel.BorderSizePixel = 0
+    subPanel.Parent = genreCard
+    Instance.new("UICorner", subPanel).CornerRadius = UDim.new(0, 6)
+    local subPanelStroke = Instance.new("UIStroke", subPanel)
+    subPanelStroke.Color = Color3.fromRGB(45, 45, 55)
+    
+    local subTitle = Instance.new("TextLabel")
+    subTitle.Size = UDim2.new(1, -60, 0, 24)
+    subTitle.Position = UDim2.new(0, 8, 0, 0)
+    subTitle.BackgroundTransparency = 1
+    subTitle.Text = Config.ActiveGenre .. " - Cards & Bundles to Place"
+    subTitle.TextColor3 = Color3.fromRGB(230, 230, 240)
+    subTitle.TextSize = 10
+    subTitle.TextXAlignment = Enum.TextXAlignment.Left
+    subTitle.Font = Enum.Font.GothamBold
+    subTitle.Parent = subPanel
+    
+    local minimizeBtn = Instance.new("TextButton")
+    minimizeBtn.Size = UDim2.new(0, 24, 0, 16)
+    minimizeBtn.Position = UDim2.new(1, -28, 0, 4)
+    minimizeBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+    minimizeBtn.Text = "[-]"
+    minimizeBtn.TextColor3 = Color3.fromRGB(200, 200, 210)
+    minimizeBtn.TextSize = 9
+    minimizeBtn.Font = Enum.Font.GothamBold
+    minimizeBtn.Parent = subPanel
+    Instance.new("UICorner", minimizeBtn).CornerRadius = UDim.new(0, 4)
+    
+    local variantsFrame = Instance.new("ScrollingFrame")
+    variantsFrame.Size = UDim2.new(1, -8, 1, -28)
+    variantsFrame.Position = UDim2.new(0, 4, 0, 24)
+    variantsFrame.BackgroundTransparency = 1
+    variantsFrame.BorderSizePixel = 0
+    variantsFrame.ScrollBarThickness = 4
+    variantsFrame.Parent = subPanel
+    
+    local function populateVariants()
+        variantsFrame:ClearAllChildren()
+        subTitle.Text = Config.ActiveGenre .. " - Cards & Bundles to Place"
+        
+        local genre = Config.ActiveGenre
+        local variants = {
+            genre,
+            genre .. "-Gold",
+            genre .. "-Emerald",
+            genre .. "-Void",
+            genre .. "-Diamond",
+            genre .. "-Rainbow",
+            genre .. " Bundle",
+            genre .. " Bundle-Gold",
+            genre .. " Bundle-Emerald",
+            genre .. " Bundle-Void",
+            genre .. " Bundle-Diamond",
+            genre .. " Bundle-Rainbow"
+        }
+        
+        local yPos = 4
+        for _, varName in ipairs(variants) do
+            local itemRow = Instance.new("Frame")
+            itemRow.Size = UDim2.new(1, -8, 0, 20)
+            itemRow.Position = UDim2.new(0, 4, 0, yPos)
+            itemRow.BackgroundTransparency = 1
+            itemRow.Parent = variantsFrame
+            
+            local toggle = Instance.new("TextButton")
+            toggle.Size = UDim2.new(0, 14, 0, 14)
+            toggle.Position = UDim2.new(0, 4, 0.5, -7)
+            toggle.BackgroundColor3 = Config.SelectedPacks[varName] and Color3.fromRGB(0, 180, 90) or Color3.fromRGB(30, 30, 35)
+            toggle.Text = Config.SelectedPacks[varName] and "✓" or ""
+            toggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+            toggle.TextSize = 10
+            toggle.Font = Enum.Font.GothamBold
+            toggle.Parent = itemRow
+            Instance.new("UICorner", toggle).CornerRadius = UDim.new(0, 3)
+            
+            local label = Instance.new("TextLabel")
+            label.Size = UDim2.new(1, -24, 1, 0)
+            label.Position = UDim2.new(0, 24, 0, 0)
+            label.BackgroundTransparency = 1
+            label.Text = varName
+            label.TextColor3 = Color3.fromRGB(200, 200, 210)
+            label.TextSize = 9
+            label.TextXAlignment = Enum.TextXAlignment.Left
+            label.Font = Enum.Font.Gotham
+            label.Parent = itemRow
+            
+            toggle.MouseButton1Click:Connect(function()
+                Config.SelectedPacks[varName] = not Config.SelectedPacks[varName]
+                toggle.BackgroundColor3 = Config.SelectedPacks[varName] and Color3.fromRGB(0, 180, 90) or Color3.fromRGB(30, 30, 35)
+                toggle.Text = Config.SelectedPacks[varName] and "✓" or ""
+            end)
+            
+            yPos = yPos + 22
+        end
+        variantsFrame.CanvasSize = UDim2.new(0, 0, 0, yPos)
+    end
+    
+    populateVariants()
+    
+    local isCollapsed = false
+    minimizeBtn.MouseButton1Click:Connect(function()
+        isCollapsed = not isCollapsed
+        if isCollapsed then
+            subPanel.Size = UDim2.new(1, -16, 0, 28)
+            genreCard.Size = UDim2.new(1, 0, 0, 100)
+            minimizeBtn.Text = "[+]"
+        else
+            subPanel.Size = UDim2.new(1, -16, 0, 215)
+            genreCard.Size = UDim2.new(1, 0, 0, 290)
+            minimizeBtn.Text = "[-]"
+        end
+    end)
+    
+    createSearchableDropdown(genreCard, "🎨 Genre to Configure:", UDim2.new(0, 0, 0, 20), UDim2.new(1, -16, 0, 20), sortedPacks, Config.ActiveGenre, function(val)
+        Config.ActiveGenre = val
+        populateVariants()
+    end)
+
+    -- Card 2: AUTO HATCH TIME CONTROL (Shifted to Y = 475)
+    local hatchCard = createCard(packTab, "AUTO HATCH TIME CONTROL", UDim2.new(1, 0, 0, 155), UDim2.new(0, 0, 0, 475))
     
     createGridToggle(hatchCard, "🧪 Auto Use Hatch Time", UDim2.new(0, 0, 0, 20), UDim2.new(1, 0, 0, 18), Config.AutoUseHatchTime, function(val)
         Config.AutoUseHatchTime = val
@@ -1659,8 +1912,8 @@ do
         if val then Config.StopAtReadyCount = val else stopReadyInput.Text = tostring(Config.StopAtReadyCount) end
     end)
 
-    -- Card 3: PACK OPENING AUTOMATION
-    local openCard = createCard(packTab, "PACK OPENING AUTOMATION", UDim2.new(1, 0, 0, 105), UDim2.new(0, 0, 0, 340))
+    -- Card 3: PACK OPENING AUTOMATION (Shifted to Y = 635)
+    local openCard = createCard(packTab, "PACK OPENING AUTOMATION", UDim2.new(1, 0, 0, 105), UDim2.new(0, 0, 0, 635))
     
     createGridToggle(openCard, "📂 Auto Open Packs", UDim2.new(0, 0, 0, 20), UDim2.new(1, 0, 0, 18), Config.AutoOpenPacks, function(val)
         Config.AutoOpenPacks = val
@@ -1707,8 +1960,8 @@ do
         if val then Config.NumReadyToOpen = val else readyInput.Text = tostring(Config.NumReadyToOpen) end
     end)
 
-    -- Card 4: PLACE PACK PRIORITY
-    local priorityCard = createCard(packTab, "PLACE PACK PRIORITY", UDim2.new(1, 0, 0, 220), UDim2.new(0, 0, 0, 450))
+    -- Card 4: PLACE PACK PRIORITY (Shifted to Y = 745)
+    local priorityCard = createCard(packTab, "PLACE PACK PRIORITY", UDim2.new(1, 0, 0, 205), UDim2.new(0, 0, 0, 745))
     
     local packsList = {"None"}
     pcall(function()
@@ -3599,7 +3852,7 @@ function startAutoCollectTokensLoop()
                                         if Config.SyncHinaHub and hasHinaSelections then
                                             isMatch = hinaSelections[pName] == true
                                         else
-                                            isMatch = target:lower() == "all" or string.find(pName:lower(), target:lower())
+                                            isMatch = Config.SelectedPacks[pName] == true
                                         end
                                         
                                         if isMatch then
