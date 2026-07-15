@@ -601,14 +601,6 @@ tabFrames["Automation"] = automationTab
 
 local activeDropdownList = nil
 
-local function getGuiRoot(obj)
-    local p = obj
-    while p and p.Parent and p.Parent.ClassName ~= "ScreenGui" do
-        p = p.Parent
-    end
-    return p
-end
-
 local function createDropdown(parent, labelText, position, size, options, defaultVal, callback)
     local frame = Instance.new("Frame")
     frame.Size = size
@@ -690,13 +682,12 @@ local function createDropdown(parent, labelText, position, size, options, defaul
                 activeDropdownList.Parent = nil
             end
             
-            local root = getGuiRoot(btn)
             local absPos = btn.AbsolutePosition
-            local rootPos = root.AbsolutePosition
+            local inset = game:GetService("GuiService"):GetGuiInset()
             
-            listFrame.Position = UDim2.new(0, absPos.X - rootPos.X, 0, absPos.Y - rootPos.Y + btn.AbsoluteSize.Y)
+            listFrame.Position = UDim2.new(0, absPos.X, 0, absPos.Y - inset.Y + btn.AbsoluteSize.Y)
             listFrame.Size = UDim2.new(0, btn.AbsoluteSize.X, 0, math.min(150, yOffset))
-            listFrame.Parent = root
+            listFrame.Parent = screenGui
             listFrame.Visible = true
             activeDropdownList = listFrame
         end
@@ -823,13 +814,12 @@ local function createSearchableDropdown(parent, labelText, position, size, optio
                 activeDropdownList.Parent = nil
             end
             
-            local root = getGuiRoot(btn)
             local absPos = btn.AbsolutePosition
-            local rootPos = root.AbsolutePosition
+            local inset = game:GetService("GuiService"):GetGuiInset()
             
-            dropdownContainer.Position = UDim2.new(0, absPos.X - rootPos.X, 0, absPos.Y - rootPos.Y + btn.AbsoluteSize.Y)
+            dropdownContainer.Position = UDim2.new(0, absPos.X, 0, absPos.Y - inset.Y + btn.AbsoluteSize.Y)
             dropdownContainer.Size = UDim2.new(0, btn.AbsoluteSize.X, 0, 180)
-            dropdownContainer.Parent = root
+            dropdownContainer.Parent = screenGui
             dropdownContainer.Visible = true
             activeDropdownList = dropdownContainer
             
