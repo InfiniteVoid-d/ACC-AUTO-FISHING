@@ -37,7 +37,6 @@ pcall(function()
             local res = oldGetData(self, key, ...)
             if actualKey == "GamepassValues" and type(res) == "table" then
                 res.AutoPlay = true
-                res.FasterTower = true
                 res.AutoCollect = true
                 res.AutoBuy = true
                 res.BeltSpeed = true
@@ -327,6 +326,8 @@ local collectThread = nil
 local collectTokensThread = nil
 local autoBuyPacksThread = nil
 local autoRelicsThread = nil
+local packsThread = nil
+local mutationThread = nil
 local collectedTokens = {}
 local uiConnection = nil
 local fishCaught = 0
@@ -393,6 +394,8 @@ _G.StopAutoFisher = function()
     if collectTokensThread then pcall(task.cancel, collectTokensThread) end
     if autoBuyPacksThread then pcall(task.cancel, autoBuyPacksThread) end
     if autoRelicsThread then pcall(task.cancel, autoRelicsThread) end
+    if packsThread then pcall(task.cancel, packsThread) packsThread = nil end
+    if mutationThread then pcall(task.cancel, mutationThread) mutationThread = nil end
     if gradingThread then pcall(task.cancel, gradingThread) end
     collectedTokens = {}
     if uiConnection then pcall(function() uiConnection:Disconnect() end) end
@@ -3739,16 +3742,16 @@ function checkAutoUpgradeRod()
     end
 end
 
-local mutationThread = nil
+mutationThread = nil
 
-local function stopMutationThread()
+function stopMutationThread()
     if mutationThread then
         task.cancel(mutationThread)
         mutationThread = nil
     end
 end
 
-local function startMutationThread()
+function startMutationThread()
     if mutationThread then return end
     mutationThread = task.spawn(function()
         local lastMutateCheck = 0
@@ -3855,16 +3858,16 @@ local function startMutationThread()
     end)
 end
 
-local packsThread = nil
+packsThread = nil
 
-local function stopPacksThread()
+function stopPacksThread()
     if packsThread then
         task.cancel(packsThread)
         packsThread = nil
     end
 end
 
-local function startPacksThread()
+function startPacksThread()
     if packsThread then return end
     packsThread = task.spawn(function()
         local lastPackOpenerCheck = 0
