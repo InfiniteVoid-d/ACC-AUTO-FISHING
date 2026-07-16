@@ -26,8 +26,16 @@ pcall(function()
     if ReplicatedData and ReplicatedData.GetData then
         local oldGetData = ReplicatedData.GetData
         ReplicatedData.GetData = function(self, key, ...)
+            local actualKey = key
+            local args = {...}
+            -- If called as ReplicatedData:GetData("Key"), self is ReplicatedData, key is "Key"
+            -- If called as ReplicatedData.GetData("Key"), self is "Key", key is nil (or second arg is shifted)
+            if type(self) ~= "table" then
+                actualKey = self
+            end
+            
             local res = oldGetData(self, key, ...)
-            if key == "GamepassValues" and type(res) == "table" then
+            if actualKey == "GamepassValues" and type(res) == "table" then
                 res.AutoPlay = true
                 res.FasterTower = true
                 res.AutoCollect = true
