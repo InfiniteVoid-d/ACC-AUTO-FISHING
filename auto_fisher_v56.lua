@@ -18,12 +18,38 @@ local MarketplaceService = game:GetService("MarketplaceService")
 local autoFishing = false
 local Config
 
--- Block Robux purchase prompts and FishEscaped signals on client
+-- Block Robux purchase prompts and spoof all client-side gamepasses/upgrades
 pcall(function()
+    -- 1. Hook ReplicatedData.GetData to intercept and spoof GamepassValues
+    local ReplicatedFirst = game:GetService("ReplicatedFirst")
+    local ReplicatedData = require(ReplicatedFirst:WaitForChild("ReplicatedData"))
+    if ReplicatedData and ReplicatedData.GetData then
+        local oldGetData = ReplicatedData.GetData
+        ReplicatedData.GetData = function(self, key, ...)
+            local res = oldGetData(self, key, ...)
+            if key == "GamepassValues" and type(res) == "table" then
+                res.AutoPlay = true
+                res.FasterTower = true
+                res.AutoCollect = true
+                res.AutoBuy = true
+                res.BeltSpeed = true
+                res.RollSpeed = true
+                res.VIP = true
+                res.DoubleXP = true
+                res.CollectAll = true
+            end
+            return res
+        end
+    end
+
+    -- 2. Hook MarketplaceService gamepass checks
     local mt = getrawmetatable(game)
     if mt then
         setreadonly(mt, false)
-        local old = mt.__namecall
+        local oldNamecall = mt.__namecall
+        local oldIndex = mt.__index
+        
+        -- Hook __namecall for UserOwnsGamePassAsync
         mt.__namecall = newcclosure(function(self, ...)
             local method = getnamecallmethod()
             local args = {...}
@@ -31,6 +57,11 @@ pcall(function()
             -- Blocker 1: Robux prompt purchase protection
             if self == MarketplaceService and (method == "PromptProductPurchase" or method == "PromptPurchase" or method == "PromptGamePassPurchase") then
                 return
+            end
+            
+            -- Spoof UserOwnsGamePassAsync
+            if self == MarketplaceService and method == "UserOwnsGamePassAsync" then
+                return true
             end
             
             -- Blocker 2: Auto-fishing escape blocker
@@ -41,8 +72,19 @@ pcall(function()
                 end
             end
             
-            return old(self, ...)
+            return oldNamecall(self, ...)
         end)
+        
+        -- Hook __index for UserOwnsGamePassAsync index calls
+        mt.__index = newcclosure(function(self, key)
+            if self == MarketplaceService and key == "UserOwnsGamePassAsync" then
+                return function(_, _, passId)
+                    return true
+                end
+            end
+            return oldIndex(self, key)
+        end)
+        
         setreadonly(mt, true)
     end
 end)
@@ -3725,16 +3767,29 @@ local function startMutationThread()
                                 local locked = fishData and fishData.Locked or false
                                 local isEquipped = table.find(equipped, fullName) ~= nil
                                 
-                                print("[Mutation Debug] Downgrade check for:", fullName, "amount:", amount, "locked:", locked, "equipped:", isEquipped)
-                                
                                 if amount > 0 and not locked and not isEquipped then
                                     setDebug("Downgrading " .. amount .. "x " .. fullName)
                                     for i = 1, amount do
                                         if not Config.AutoMutateDowngrade or Config.SelectedDowngradeFish[fullName] ~= true then
                                             break
                                         end
-                                        ReplicatedStorage.Remotes.Fish:FireServer("Mutate", fullName, "D")
-                                        task.wait(0.1)
+                                        
+                                        -- Trigger via UI click simulation to bypass server checks
+                                        pcall(function()
+                                            local FishHandler = require(ReplicatedStorage.Client.UI.FishHandler)
+                                            FishHandler.MutationFishSelected(fullName)
+                                            task.wait(0.2)
+                                            
+                                            local gui = player.PlayerGui:FindFirstChild("FishMutations")
+                                            local downBtn = gui and gui.Frame.CenterFrame.Downgrade
+                                            if downBtn then
+                                                local down = getconnections(downBtn.MouseButton1Down)
+                                                local up = getconnections(downBtn.MouseButton1Up)
+                                                for _, con in ipairs(down) do con:Fire() end
+                                                for _, con in ipairs(up) do con:Fire() end
+                                            end
+                                        end)
+                                        task.wait(0.5)
                                     end
                                 end
                             end
@@ -3751,8 +3806,6 @@ local function startMutationThread()
                                 local locked = fishData and fishData.Locked or false
                                 local isEquipped = table.find(equipped, fullName) ~= nil
                                 
-                                print("[Mutation Debug] Upgrade check for:", fullName, "amount:", amount, "locked:", locked, "equipped:", isEquipped)
-                                
                                 if amount >= 3 and not locked and not isEquipped then
                                     local upgradeCount = math.floor(amount / 3)
                                     setDebug("Upgrading " .. (upgradeCount * 3) .. "x " .. fullName)
@@ -3760,8 +3813,23 @@ local function startMutationThread()
                                         if not Config.AutoMutateUpgrade or Config.SelectedUpgradeFish[fullName] ~= true then
                                             break
                                         end
-                                        ReplicatedStorage.Remotes.Fish:FireServer("Mutate", fullName, "U")
-                                        task.wait(0.1)
+                                        
+                                        -- Trigger via UI click simulation to bypass server checks
+                                        pcall(function()
+                                            local FishHandler = require(ReplicatedStorage.Client.UI.FishHandler)
+                                            FishHandler.MutationFishSelected(fullName)
+                                            task.wait(0.2)
+                                            
+                                            local gui = player.PlayerGui:FindFirstChild("FishMutations")
+                                            local upBtn = gui and gui.Frame.CenterFrame.Upgrade
+                                            if upBtn then
+                                                local down = getconnections(upBtn.MouseButton1Down)
+                                                local up = getconnections(upBtn.MouseButton1Up)
+                                                for _, con in ipairs(down) do con:Fire() end
+                                                for _, con in ipairs(up) do con:Fire() end
+                                            end
+                                        end)
+                                        task.wait(0.5)
                                     end
                                 end
                             end
