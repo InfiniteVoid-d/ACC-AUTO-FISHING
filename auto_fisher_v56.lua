@@ -3711,7 +3711,7 @@ local function startMutationThread()
             if (now - lastMutateCheck) >= 2.0 then
                 lastMutateCheck = now
                 
-                pcall(function()
+                local success, err = pcall(function()
                     local fishInv = ReplicatedData.GetData("Fish") or {}
                     local equipped = ReplicatedData.GetData("FishEquipped") or {}
                     
@@ -3723,8 +3723,11 @@ local function startMutationThread()
                                 local fishData = currentInv[fullName]
                                 local amount = fishData and fishData.Amount or 0
                                 local locked = fishData and fishData.Locked or false
+                                local isEquipped = table.find(equipped, fullName) ~= nil
                                 
-                                if amount > 0 and not locked and not table.find(equipped, fullName) then
+                                print("[Mutation Debug] Downgrade check for:", fullName, "amount:", amount, "locked:", locked, "equipped:", isEquipped)
+                                
+                                if amount > 0 and not locked and not isEquipped then
                                     setDebug("Downgrading " .. amount .. "x " .. fullName)
                                     for i = 1, amount do
                                         if not Config.AutoMutateDowngrade or Config.SelectedDowngradeFish[fullName] ~= true then
@@ -3746,8 +3749,11 @@ local function startMutationThread()
                                 local fishData = currentInv[fullName]
                                 local amount = fishData and fishData.Amount or 0
                                 local locked = fishData and fishData.Locked or false
+                                local isEquipped = table.find(equipped, fullName) ~= nil
                                 
-                                if amount >= 3 and not locked and not table.find(equipped, fullName) then
+                                print("[Mutation Debug] Upgrade check for:", fullName, "amount:", amount, "locked:", locked, "equipped:", isEquipped)
+                                
+                                if amount >= 3 and not locked and not isEquipped then
                                     local upgradeCount = math.floor(amount / 3)
                                     setDebug("Upgrading " .. (upgradeCount * 3) .. "x " .. fullName)
                                     for i = 1, upgradeCount do
@@ -3762,6 +3768,9 @@ local function startMutationThread()
                         end
                     end
                 end)
+                if not success then
+                    print("[Mutation Debug] Error in thread: " .. tostring(err))
+                end
             end
             
             task.wait(0.5)
