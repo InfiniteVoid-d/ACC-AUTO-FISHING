@@ -3943,12 +3943,26 @@ function startPacksThread()
                         end
                         
                         if totalEligibleCount > 0 then
-                            -- Check if legit walk is enabled (TPPlace is false)
-                            if not Config.TPPlace then
-                                local floor = plot:FindFirstChild("Misc") and plot.Misc:FindFirstChild("Floor")
-                                if floor then
-                                    setDebug("Auto-walking to plot floor base to place packs...")
-                                    walkTo(floor.Position)
+                            local oldCFrame = nil
+                            local floor = plot:FindFirstChild("Misc") and plot.Misc:FindFirstChild("Floor")
+                            if Config.TPPlace and floor then
+                                local char = player.Character
+                                local root = char and char:FindFirstChild("HumanoidRootPart")
+                                if root then
+                                    oldCFrame = root.CFrame
+                                    root.CFrame = floor.CFrame + Vector3.new(0, 3, 0)
+                                    task.wait(0.15)
+                                end
+                            elseif not Config.TPPlace and floor then
+                                setDebug("Auto-walking to plot floor base to place packs...")
+                                walkTo(floor.Position)
+                                local char = player.Character
+                                local root = char and char:FindFirstChild("HumanoidRootPart")
+                                if root then
+                                    local startWalkTime = os.time()
+                                    while (root.Position - floor.Position).Magnitude > 8 and (os.time() - startWalkTime) < 5 do
+                                        task.wait(0.1)
+                                    end
                                 end
                             end
                             
@@ -3958,16 +3972,30 @@ function startPacksThread()
                                 if not Config.AutoPlacePacks then break end
                                 local pack = eligiblePacks[currentPackIdx]
                                 if pack.amount > 0 then
-                                    -- Equip pack to hotbar slot 1
+                                    -- Equip pack to hotbar slot 1 on server
                                     ReplicatedStorage.Remotes.Card:FireServer("Hotbar", "1", pack.name)
+                                    task.wait(0.05)
+                                    ReplicatedStorage.Remotes.Card:FireServer("Equip", pack.name)
                                     task.wait(0.05)
                                     -- Place the pack
                                     ReplicatedStorage.Remotes.Card:FireServer("Place", pack.name)
+                                    task.wait(0.05)
+                                    ReplicatedStorage.Remotes.Card:FireServer("Unequip", pack.name)
+                                    
                                     pack.amount = pack.amount - 1
                                     placedCount = placedCount + 1
                                     task.wait(0.08) -- Rapid placement!
                                 else
                                     currentPackIdx = currentPackIdx + 1
+                                end
+                            end
+                            
+                            if oldCFrame then
+                                local char = player.Character
+                                local root = char and char:FindFirstChild("HumanoidRootPart")
+                                if root then
+                                    root.CFrame = oldCFrame
+                                    task.wait(0.1)
                                 end
                             end
                         end
@@ -3984,7 +4012,7 @@ function startPacksThread()
                         for _, pack in ipairs(plot.Packs:GetChildren()) do
                             local prompt = pack:FindFirstChildWhichIsA("ProximityPrompt", true)
                             if prompt and prompt.Enabled then
-                                if prompt.ActionText == "Open Pack" then
+                                if string.find(prompt.ActionText, "Open") then
                                     readyCount = readyCount + 1
                                 else
                                     hasHatching = true
@@ -4036,7 +4064,7 @@ function startPacksThread()
                         local readyPacks = {}
                         for _, pack in ipairs(plot.Packs:GetChildren()) do
                             local prompt = pack:FindFirstChildWhichIsA("ProximityPrompt", true)
-                            if prompt and prompt.Enabled and prompt.ActionText == "Open Pack" then
+                            if prompt and prompt.Enabled and string.find(prompt.ActionText, "Open") then
                                 table.insert(readyPacks, {model = pack, prompt = prompt})
                             end
                         end
@@ -4051,7 +4079,7 @@ function startPacksThread()
                                 local pack = packData.model
                                 local prompt = packData.prompt
                                 
-                                if prompt and prompt.Enabled and prompt.ActionText == "Open Pack" then
+                                if prompt and prompt.Enabled and string.find(prompt.ActionText, "Open") then
                                     if not Config.TPCollect then
                                         -- Legit walk normally to the ready card model
                                         setDebug("Walking to open pack: " .. pack.Name)
@@ -4080,7 +4108,7 @@ function startPacksThread()
                                             setDebug("Teleporting to open pack: " .. pack.Name)
                                             local oldCFrame = root.CFrame
                                             root.CFrame = pack:GetPivot()
-                                            task.wait(0.2)
+                                            task.wait(0.25)
                                             pcall(function()
                                                 prompt.HoldDuration = 0
                                                 prompt.RequiresLineOfSight = false
