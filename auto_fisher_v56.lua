@@ -4001,59 +4001,60 @@ function startPacksThread()
                         end
                     end
                     
-                    -- 2. Auto Use Hatch Time Potions
+                    -- 2. Auto Use Hatch Time Potions (Lowest tier first: HatchTime1 -> HatchTime2 -> HatchTime3)
                     if Config.AutoUseHatchTime and plot:FindFirstChild("Packs") then
-                        local threshold = Config.UseWhenPackPlaced or 70
-                        local shouldApply = placedCount >= threshold or (placedCount > 0 and not Config.AutoPlacePacks)
-                        
-                        -- Count ready packs to check stop limit
-                        local readyCount = 0
-                        local hasHatching = false
-                        for _, pack in ipairs(plot.Packs:GetChildren()) do
-                            local prompt = pack:FindFirstChildWhichIsA("ProximityPrompt", true)
-                            if prompt and prompt.Enabled then
-                                if string.find(prompt.ActionText, "Open") then
-                                    readyCount = readyCount + 1
-                                else
-                                    hasHatching = true
-                                end
-                            end
-                        end
-                        
-                        if shouldApply and hasHatching and readyCount < (Config.StopAtReadyCount or 1) then
-                            -- Get count of active hatch potions on our plot floor
-                            local activeHatchPotions = 0
-                            local activeArea = plot:FindFirstChild("Active")
-                            if activeArea then
-                                for _, child in ipairs(activeArea:GetChildren()) do
-                                    if child.Name:find("HatchTime") then
-                                        activeHatchPotions = activeHatchPotions + 1
+                        local placedPacksCount = #plot.Packs:GetChildren()
+                        if placedPacksCount > 0 then
+                            local threshold = Config.UseWhenPackPlaced or 70
+                            local shouldApply = placedCount >= threshold or (placedCount > 0 and not Config.AutoPlacePacks)
+                            
+                            -- Count ready packs to check stop limit
+                            local readyCount = 0
+                            local hasHatching = false
+                            for _, pack in ipairs(plot.Packs:GetChildren()) do
+                                local prompt = pack:FindFirstChildWhichIsA("ProximityPrompt", true)
+                                if prompt and prompt.Enabled then
+                                    if string.find(prompt.ActionText, "Open") then
+                                        readyCount = readyCount + 1
+                                    else
+                                        hasHatching = true
                                     end
                                 end
                             end
                             
-                            -- If we don't exceed max simultaneous active potions (default 3)
-                            if activeHatchPotions < 3 then
-                                local consumables = ReplicatedData.GetData("Consumables") or {}
-                                local targetPotion = nil
-                                
-                                -- Check checkboxes in GUI for selected potions
-                                local ht3Selected = Config.SelectedPotions and Config.SelectedPotions["HatchTime3"] == true
-                                local ht2Selected = Config.SelectedPotions and Config.SelectedPotions["HatchTime2"] == true
-                                local ht1Selected = Config.SelectedPotions and Config.SelectedPotions["HatchTime1"] == true
-                                
-                                if ht3Selected and (consumables.HatchTime3 or 0) > 0 then
-                                    targetPotion = "HatchTime3"
-                                elseif ht2Selected and (consumables.HatchTime2 or 0) > 0 then
-                                    targetPotion = "HatchTime2"
-                                elseif ht1Selected and (consumables.HatchTime1 or 0) > 0 then
-                                    targetPotion = "HatchTime1"
+                            if shouldApply and hasHatching and readyCount < (Config.StopAtReadyCount or 1) then
+                                local activeHatchPotions = 0
+                                local activeArea = plot:FindFirstChild("Active")
+                                if activeArea then
+                                    for _, child in ipairs(activeArea:GetChildren()) do
+                                        if child.Name:find("HatchTime") then
+                                            activeHatchPotions = activeHatchPotions + 1
+                                        end
+                                    end
                                 end
                                 
-                                if targetPotion then
-                                    setDebug("Hatching: applying " .. targetPotion)
-                                    pcall(function() ReplicatedStorage.Remotes.Potion:FireServer("Apply", targetPotion) end)
-                                    task.wait(0.2)
+                                if activeHatchPotions < 3 then
+                                    local consumables = ReplicatedData.GetData("Consumables") or {}
+                                    local targetPotion = nil
+                                    
+                                    -- Check checkboxes in GUI for selected potions (LOWEST TIER FIRST: HatchTime1 -> HatchTime2 -> HatchTime3)
+                                    local ht1Selected = Config.SelectedPotions and Config.SelectedPotions["HatchTime1"] == true
+                                    local ht2Selected = Config.SelectedPotions and Config.SelectedPotions["HatchTime2"] == true
+                                    local ht3Selected = Config.SelectedPotions and Config.SelectedPotions["HatchTime3"] == true
+                                    
+                                    if ht1Selected and (consumables.HatchTime1 or 0) > 0 then
+                                        targetPotion = "HatchTime1"
+                                    elseif ht2Selected and (consumables.HatchTime2 or 0) > 0 then
+                                        targetPotion = "HatchTime2"
+                                    elseif ht3Selected and (consumables.HatchTime3 or 0) > 0 then
+                                        targetPotion = "HatchTime3"
+                                    end
+                                    
+                                    if targetPotion then
+                                        setDebug("Hatching: applying lowest tier potion: " .. targetPotion)
+                                        pcall(function() ReplicatedStorage.Remotes.Potion:FireServer("Apply", targetPotion) end)
+                                        task.wait(0.2)
+                                    end
                                 end
                             end
                         end
