@@ -3952,19 +3952,14 @@ function startPacksThread()
                         if totalEligibleCount > 0 then
                             local oldCFrame = nil
                             local floor = plot:FindFirstChild("Misc") and plot.Misc:FindFirstChild("Floor")
-                            if Config.TPPlace and floor then
-                                local char = player.Character
-                                local root = char and char:FindFirstChild("HumanoidRootPart")
-                                if root then
-                                    oldCFrame = root.CFrame
-                                    root.CFrame = floor.CFrame + Vector3.new(0, 3, 0)
-                                    task.wait(0.15)
-                                end
+                            local char = player.Character
+                            local root = char and char:FindFirstChild("HumanoidRootPart")
+                            
+                            if Config.TPPlace and floor and root then
+                                oldCFrame = root.CFrame
                             elseif not Config.TPPlace and floor then
                                 setDebug("Auto-walking to plot floor base to place packs...")
                                 walkTo(floor.Position)
-                                local char = player.Character
-                                local root = char and char:FindFirstChild("HumanoidRootPart")
                                 if root then
                                     local startWalkTime = os.time()
                                     while (root.Position - floor.Position).Magnitude > 8 and (os.time() - startWalkTime) < 5 do
@@ -3973,35 +3968,51 @@ function startPacksThread()
                                 end
                             end
                             
-                            setDebug(string.format("Placing packs... Current: %d/%d", placedCount, maxPlacements))
+                            -- Generate grid steps (10-stud spacing) across plot floor
+                            local gridSteps = {}
+                            for x = -20, 20, 10 do
+                                for z = -30, 30, 10 do
+                                    table.insert(gridSteps, Vector3.new(x, 3, z))
+                                end
+                            end
+                            
+                            setDebug(string.format("Placing packs grid... Current: %d/%d", placedCount, maxPlacements))
                             local currentPackIdx = 1
-                            while placedCount < maxPlacements and currentPackIdx <= #eligiblePacks do
+                            local gridIndex = 1
+                            
+                            while placedCount < maxPlacements and currentPackIdx <= #eligiblePacks and gridIndex <= #gridSteps do
                                 if not Config.AutoPlacePacks then break end
                                 local pack = eligiblePacks[currentPackIdx]
                                 if pack.amount > 0 then
+                                    if Config.TPPlace and floor and root then
+                                        local step = gridSteps[gridIndex]
+                                        root.CFrame = floor.CFrame * CFrame.new(step)
+                                        task.wait(0.1)
+                                    end
+                                    
                                     ReplicatedStorage.Remotes.Card:FireServer("Hotbar", "1", pack.name)
                                     task.wait(0.05)
                                     ReplicatedStorage.Remotes.Card:FireServer("Equip", pack.name)
                                     task.wait(0.05)
                                     ReplicatedStorage.Remotes.Card:FireServer("Place", pack.name)
-                                    task.wait(0.05)
+                                    task.wait(0.06)
                                     ReplicatedStorage.Remotes.Card:FireServer("Unequip", pack.name)
+                                    task.wait(0.05)
                                     
-                                    pack.amount = pack.amount - 1
-                                    placedCount = placedCount + 1
-                                    task.wait(0.08)
+                                    local newPlacedCount = #ReplicatedData.GetData("PacksPlaced")
+                                    if newPlacedCount > placedCount then
+                                        placedCount = newPlacedCount
+                                        pack.amount = pack.amount - 1
+                                    end
+                                    gridIndex = gridIndex + 1
                                 else
                                     currentPackIdx = currentPackIdx + 1
                                 end
                             end
                             
-                            if oldCFrame then
-                                local char = player.Character
-                                local root = char and char:FindFirstChild("HumanoidRootPart")
-                                if root then
-                                    root.CFrame = oldCFrame
-                                    task.wait(0.1)
-                                end
+                            if oldCFrame and root then
+                                root.CFrame = oldCFrame
+                                task.wait(0.1)
                             end
                         end
                     end
@@ -4010,9 +4021,6 @@ function startPacksThread()
                     if Config.AutoUseHatchTime and plot:FindFirstChild("Packs") then
                         local placedPacksCount = #plot.Packs:GetChildren()
                         if placedPacksCount > 0 then
-                            local threshold = Config.UseWhenPackPlaced or 70
-                            local shouldApply = placedCount >= threshold or (placedCount > 0 and not Config.AutoPlacePacks)
-                            
                             local readyCount = 0
                             local hasHatching = false
                             for _, pack in ipairs(plot.Packs:GetChildren()) do
@@ -4026,7 +4034,7 @@ function startPacksThread()
                                 end
                             end
                             
-                            if shouldApply and hasHatching and readyCount < (Config.StopAtReadyCount or 1) then
+                            if hasHatching then
                                 local activeHatchPotions = 0
                                 local activeArea = plot:FindFirstChild("Active")
                                 if activeArea then
