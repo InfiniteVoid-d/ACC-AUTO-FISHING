@@ -4085,6 +4085,7 @@ function startPacksThread()
                                 local prompt = packData.prompt
                                 
                                 if prompt and prompt.Enabled and string.find(prompt.ActionText, "Open") then
+                                    local packUuid = pack.Name:split(".")[1]
                                     if not Config.TPCollect then
                                         setDebug("Walking to open pack: " .. pack.Name)
                                         walkTo(pack:GetPivot().Position)
@@ -4094,10 +4095,11 @@ function startPacksThread()
                                             prompt.RequiresLineOfSight = false
                                             if fireproximityprompt then
                                                 fireproximityprompt(prompt)
-                                            else
-                                                prompt:InputBegan(player)
                                             end
                                         end)
+                                        if packUuid and #packUuid > 10 then
+                                            pcall(function() ReplicatedStorage.Remotes.Card:FireServer("Collect", packUuid) end)
+                                        end
                                         task.wait(0.2)
                                     else
                                         setDebug("Opening pack: " .. pack.Name)
@@ -4111,8 +4113,10 @@ function startPacksThread()
                                             if fireproximityprompt then
                                                 fireproximityprompt(prompt)
                                             end
-                                            prompt:InputBegan(player)
                                         end)
+                                        if packUuid and #packUuid > 10 then
+                                            pcall(function() ReplicatedStorage.Remotes.Card:FireServer("Collect", packUuid) end)
+                                        end
                                         task.wait(0.15)
                                     end
                                 end
