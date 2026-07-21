@@ -1896,19 +1896,33 @@ do
     
     createGridToggle(hatchCard, "🧪 Auto Use Hatch Time", UDim2.new(0, 0, 0, 20), UDim2.new(1, 0, 0, 18), Config.AutoUseHatchTime, function(val)
         Config.AutoUseHatchTime = val
-        if val then startPacksThread() end
+        if val then
+            if not Config.SelectedPotions then
+                Config.SelectedPotions = { HatchTime1 = true, HatchTime2 = true, HatchTime3 = true }
+            else
+                if not Config.SelectedPotions["HatchTime1"] and not Config.SelectedPotions["HatchTime2"] and not Config.SelectedPotions["HatchTime3"] then
+                    Config.SelectedPotions["HatchTime1"] = true
+                    Config.SelectedPotions["HatchTime2"] = true
+                    Config.SelectedPotions["HatchTime3"] = true
+                end
+            end
+            startPacksThread()
+        end
     end)
     
     -- Selected Potions Checkbox Toggles
-    createGridToggle(hatchCard, "🧪 Use Hatch Time I Potion", UDim2.new(0, 0, 0, 42), UDim2.new(1, 0, 0, 18), Config.SelectedPotions["HatchTime1"], function(val)
+    createGridToggle(hatchCard, "🧪 Use Hatch Time I Potion", UDim2.new(0, 0, 0, 42), UDim2.new(1, 0, 0, 18), Config.SelectedPotions and Config.SelectedPotions["HatchTime1"] ~= false, function(val)
+        if not Config.SelectedPotions then Config.SelectedPotions = {} end
         Config.SelectedPotions["HatchTime1"] = val
     end)
     
-    createGridToggle(hatchCard, "🧪 Use Hatch Time II Potion", UDim2.new(0, 0, 0, 64), UDim2.new(1, 0, 0, 18), Config.SelectedPotions["HatchTime2"], function(val)
+    createGridToggle(hatchCard, "🧪 Use Hatch Time II Potion", UDim2.new(0, 0, 0, 64), UDim2.new(1, 0, 0, 18), Config.SelectedPotions and Config.SelectedPotions["HatchTime2"] ~= false, function(val)
+        if not Config.SelectedPotions then Config.SelectedPotions = {} end
         Config.SelectedPotions["HatchTime2"] = val
     end)
     
-    createGridToggle(hatchCard, "🧪 Use Hatch Time III Potion", UDim2.new(0, 0, 0, 86), UDim2.new(1, 0, 0, 18), Config.SelectedPotions["HatchTime3"], function(val)
+    createGridToggle(hatchCard, "🧪 Use Hatch Time III Potion", UDim2.new(0, 0, 0, 86), UDim2.new(1, 0, 0, 18), Config.SelectedPotions and Config.SelectedPotions["HatchTime3"] ~= false, function(val)
+        if not Config.SelectedPotions then Config.SelectedPotions = {} end
         Config.SelectedPotions["HatchTime3"] = val
     end)
     
@@ -3909,7 +3923,7 @@ function startPacksThread()
                         local totalEligibleCount = 0
                         local matchedPacks = {}
                         
-                        -- Search by Priority Slots (Slot 1 to 7)
+                        -- 1. Search by Priority Slots (Slot 1 to 7)
                         for _, priorityName in ipairs(Config.PrioritySlots or {}) do
                             if priorityName and priorityName ~= "" then
                                 for pName, amt in pairs(ownedPacks) do
@@ -3922,29 +3936,39 @@ function startPacksThread()
                             end
                         end
                         
-                        -- Fallback to SelectedPacks, HinaHub, or any owned pack if no priority matches
+                        -- 2. Selected Packs Checkboxes in GUI
+                        if totalEligibleCount == 0 and Config.SelectedPacks and next(Config.SelectedPacks) then
+                            for selName, isSel in pairs(Config.SelectedPacks) do
+                                if isSel then
+                                    for pName, amt in pairs(ownedPacks) do
+                                        if amt > 0 and not matchedPacks[pName] and (selName:lower() == "all" or string.find(pName:lower(), selName:lower())) then
+                                            matchedPacks[pName] = true
+                                            table.insert(eligiblePacks, {name = pName, amount = amt})
+                                            totalEligibleCount = totalEligibleCount + amt
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                        
+                        -- 3. Hina Hub Selections
+                        if totalEligibleCount == 0 and Config.SyncHinaHub and hasHinaSelections then
+                            for pName, amt in pairs(ownedPacks) do
+                                if amt > 0 and not matchedPacks[pName] and hinaSelections[pName] == true then
+                                    matchedPacks[pName] = true
+                                    table.insert(eligiblePacks, {name = pName, amount = amt})
+                                    totalEligibleCount = totalEligibleCount + amt
+                                end
+                            end
+                        end
+                        
+                        -- 4. Default Fallback: Place ANY owned pack/bundle in inventory
                         if totalEligibleCount == 0 then
                             for pName, amt in pairs(ownedPacks) do
-                                if amt > 0 then
-                                    local isMatch = false
-                                    if Config.SyncHinaHub and hasHinaSelections then
-                                        isMatch = hinaSelections[pName] == true
-                                    elseif Config.SelectedPacks and next(Config.SelectedPacks) then
-                                        for selName, isSel in pairs(Config.SelectedPacks) do
-                                            if isSel and (selName:lower() == "all" or string.find(pName:lower(), selName:lower())) then
-                                                isMatch = true
-                                                break
-                                            end
-                                        end
-                                    else
-                                        isMatch = true -- default: place any owned pack
-                                    end
-                                    
-                                    if isMatch and not matchedPacks[pName] then
-                                        matchedPacks[pName] = true
-                                        table.insert(eligiblePacks, {name = pName, amount = amt})
-                                        totalEligibleCount = totalEligibleCount + amt
-                                    end
+                                if amt > 0 and not matchedPacks[pName] then
+                                    matchedPacks[pName] = true
+                                    table.insert(eligiblePacks, {name = pName, amount = amt})
+                                    totalEligibleCount = totalEligibleCount + amt
                                 end
                             end
                         end
@@ -3968,7 +3992,7 @@ function startPacksThread()
                                 end
                             end
                             
-                            -- Generate grid steps (10-stud spacing) across plot floor
+                            -- Generate 2D grid steps (10-stud spacing) across plot floor
                             local gridSteps = {}
                             for x = -20, 20, 10 do
                                 for z = -30, 30, 10 do
@@ -4022,18 +4046,14 @@ function startPacksThread()
                         local placedPacksCount = #plot.Packs:GetChildren()
                         if placedPacksCount > 0 then
                             local readyCount = 0
-                            local hasHatching = false
                             for _, pack in ipairs(plot.Packs:GetChildren()) do
                                 local prompt = pack:FindFirstChildWhichIsA("ProximityPrompt", true)
-                                if prompt and prompt.Enabled then
-                                    if string.find(prompt.ActionText, "Open") then
-                                        readyCount = readyCount + 1
-                                    else
-                                        hasHatching = true
-                                    end
+                                if prompt and prompt.Enabled and string.find(prompt.ActionText, "Open") then
+                                    readyCount = readyCount + 1
                                 end
                             end
                             
+                            local hasHatching = placedPacksCount > readyCount
                             if hasHatching then
                                 local activeHatchPotions = 0
                                 local activeArea = plot:FindFirstChild("Active")
@@ -4049,9 +4069,9 @@ function startPacksThread()
                                     local consumables = ReplicatedData.GetData("Consumables") or {}
                                     local targetPotion = nil
                                     
-                                    local ht1Selected = Config.SelectedPotions and Config.SelectedPotions["HatchTime1"] == true
-                                    local ht2Selected = Config.SelectedPotions and Config.SelectedPotions["HatchTime2"] == true
-                                    local ht3Selected = Config.SelectedPotions and Config.SelectedPotions["HatchTime3"] == true
+                                    local ht1Selected = not Config.SelectedPotions or Config.SelectedPotions["HatchTime1"] ~= false
+                                    local ht2Selected = not Config.SelectedPotions or Config.SelectedPotions["HatchTime2"] ~= false
+                                    local ht3Selected = not Config.SelectedPotions or Config.SelectedPotions["HatchTime3"] ~= false
                                     
                                     if ht1Selected and (consumables.HatchTime1 or 0) > 0 then
                                         targetPotion = "HatchTime1"
