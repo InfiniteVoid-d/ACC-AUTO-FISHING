@@ -3917,7 +3917,15 @@ function startPacksThread()
                         break
                     end
                     
-                    -- 1. Auto Place Packs
+                    -- Generate 2D edge-to-edge grid steps (5-stud spacing starting at plot edge X=-35, Z=-35)
+                    local gridSteps = {}
+                    for x = -35, 35, 5 do
+                        for z = -35, 35, 10 do
+                            table.insert(gridSteps, Vector3.new(x, 3, z))
+                        end
+                    end
+                    
+                    -- 1. Auto Place Packs (Fill up to target PlaceLimit / MaxPlacements first)
                     if Config.AutoPlacePacks and placedCount < maxPlacements then
                         local eligiblePacks = {}
                         local totalEligibleCount = 0
@@ -3992,14 +4000,6 @@ function startPacksThread()
                                 end
                             end
                             
-                            -- Generate 2D grid steps (10-stud spacing) across plot floor
-                            local gridSteps = {}
-                            for x = -20, 20, 10 do
-                                for z = -30, 30, 10 do
-                                    table.insert(gridSteps, Vector3.new(x, 3, z))
-                                end
-                            end
-                            
                             setDebug(string.format("Placing packs grid... Current: %d/%d", placedCount, maxPlacements))
                             local currentPackIdx = 1
                             local gridIndex = 1
@@ -4041,68 +4041,73 @@ function startPacksThread()
                         end
                     end
                     
-                    -- 2. Auto Use Hatch Time Potions (Lowest tier first: HatchTime1 -> HatchTime2 -> HatchTime3)
+                    -- Count ready packs currently on plot
+                    local readyCount = 0
+                    if plot:FindFirstChild("Packs") then
+                        for _, pack in ipairs(plot.Packs:GetChildren()) do
+                            local prompt = pack:FindFirstChildWhichIsA("ProximityPrompt", true)
+                            if prompt and prompt.Enabled and string.find(prompt.ActionText, "Open") then
+                                readyCount = readyCount + 1
+                            end
+                        end
+                    end
+                    
+                    -- 2. Auto Use Hatch Time Potions
+                    -- Condition: Runs after packs are placed (or when placement target reached), and until StopAtReadyCount target is met
                     if Config.AutoUseHatchTime and plot:FindFirstChild("Packs") then
                         local placedPacksCount = #plot.Packs:GetChildren()
-                        if placedPacksCount > 0 then
-                            local readyCount = 0
-                            for _, pack in ipairs(plot.Packs:GetChildren()) do
-                                local prompt = pack:FindFirstChildWhichIsA("ProximityPrompt", true)
-                                if prompt and prompt.Enabled and string.find(prompt.ActionText, "Open") then
-                                    readyCount = readyCount + 1
+                        local stopAtReady = Config.StopAtReadyCount or 1
+                        
+                        -- Check if we should apply hatch potions: packs placed > 0, still have unhatched packs, and readyCount is below stopAtReady
+                        if placedPacksCount > 0 and placedPacksCount > readyCount and readyCount < stopAtReady then
+                            local activeHatchPotions = 0
+                            local activeArea = plot:FindFirstChild("Active")
+                            if activeArea then
+                                for _, child in ipairs(activeArea:GetChildren()) do
+                                    if child.Name:find("HatchTime") then
+                                        activeHatchPotions = activeHatchPotions + 1
+                                    end
                                 end
                             end
                             
-                            local hasHatching = placedPacksCount > readyCount
-                            if hasHatching then
-                                local activeHatchPotions = 0
-                                local activeArea = plot:FindFirstChild("Active")
-                                if activeArea then
-                                    for _, child in ipairs(activeArea:GetChildren()) do
-                                        if child.Name:find("HatchTime") then
-                                            activeHatchPotions = activeHatchPotions + 1
-                                        end
-                                    end
+                            if activeHatchPotions < 3 then
+                                local consumables = ReplicatedData.GetData("Consumables") or {}
+                                local targetPotion = nil
+                                
+                                local ht1Selected = not Config.SelectedPotions or Config.SelectedPotions["HatchTime1"] ~= false
+                                local ht2Selected = not Config.SelectedPotions or Config.SelectedPotions["HatchTime2"] ~= false
+                                local ht3Selected = not Config.SelectedPotions or Config.SelectedPotions["HatchTime3"] ~= false
+                                
+                                if ht1Selected and (consumables.HatchTime1 or 0) > 0 then
+                                    targetPotion = "HatchTime1"
+                                elseif ht2Selected and (consumables.HatchTime2 or 0) > 0 then
+                                    targetPotion = "HatchTime2"
+                                elseif ht3Selected and (consumables.HatchTime3 or 0) > 0 then
+                                    targetPotion = "HatchTime3"
                                 end
                                 
-                                if activeHatchPotions < 3 then
-                                    local consumables = ReplicatedData.GetData("Consumables") or {}
-                                    local targetPotion = nil
-                                    
-                                    local ht1Selected = not Config.SelectedPotions or Config.SelectedPotions["HatchTime1"] ~= false
-                                    local ht2Selected = not Config.SelectedPotions or Config.SelectedPotions["HatchTime2"] ~= false
-                                    local ht3Selected = not Config.SelectedPotions or Config.SelectedPotions["HatchTime3"] ~= false
-                                    
-                                    if ht1Selected and (consumables.HatchTime1 or 0) > 0 then
-                                        targetPotion = "HatchTime1"
-                                    elseif ht2Selected and (consumables.HatchTime2 or 0) > 0 then
-                                        targetPotion = "HatchTime2"
-                                    elseif ht3Selected and (consumables.HatchTime3 or 0) > 0 then
-                                        targetPotion = "HatchTime3"
-                                    end
-                                    
-                                    if targetPotion then
-                                        setDebug("Hatching: applying lowest tier potion: " .. targetPotion)
-                                        pcall(function() ReplicatedStorage.Remotes.Potion:FireServer("Apply", targetPotion) end)
-                                        task.wait(0.2)
-                                    end
+                                if targetPotion then
+                                    setDebug("Hatching: applying lowest tier potion: " .. targetPotion)
+                                    pcall(function() ReplicatedStorage.Remotes.Potion:FireServer("Apply", targetPotion) end)
+                                    task.wait(0.2)
                                 end
                             end
                         end
                     end
                     
                     -- 3. Auto Open Packs & Bundles
+                    -- Condition: Trigger opening when readyPacks count reaches or exceeds NumReadyToOpen setting
                     if Config.AutoOpenPacks and plot:FindFirstChild("Packs") then
-                        local readyPacks = {}
-                        for _, pack in ipairs(plot.Packs:GetChildren()) do
-                            local prompt = pack:FindFirstChildWhichIsA("ProximityPrompt", true)
-                            if prompt and prompt.Enabled and string.find(prompt.ActionText, "Open") then
-                                table.insert(readyPacks, {model = pack, prompt = prompt})
-                            end
-                        end
-                        
                         local targetReadyOpen = Config.NumReadyToOpen or 1
-                        if #readyPacks >= targetReadyOpen then
+                        if readyCount >= targetReadyOpen then
+                            local readyPacks = {}
+                            for _, pack in ipairs(plot.Packs:GetChildren()) do
+                                local prompt = pack:FindFirstChildWhichIsA("ProximityPrompt", true)
+                                if prompt and prompt.Enabled and string.find(prompt.ActionText, "Open") then
+                                    table.insert(readyPacks, {model = pack, prompt = prompt})
+                                end
+                            end
+                            
                             local char = player.Character
                             local root = char and char:FindFirstChild("HumanoidRootPart")
                             local originalCFrame = root and root.CFrame
