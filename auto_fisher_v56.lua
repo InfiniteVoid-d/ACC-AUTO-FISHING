@@ -3877,7 +3877,7 @@ function startPacksThread()
             end
             
             local now = os.time()
-            if (now - lastPackOpenerCheck) >= 1.5 then
+            if (now - lastPackOpenerCheck) >= 1.0 then
                 lastPackOpenerCheck = now
                 
                 local success, err = pcall(function()
@@ -3905,13 +3905,12 @@ function startPacksThread()
                     
                     -- 1. Auto Place Packs
                     if Config.AutoPlacePacks and placedCount < maxPlacements then
-                        -- Determine eligible packs in inventory
                         local eligiblePacks = {}
                         local totalEligibleCount = 0
-                        
                         local matchedPacks = {}
+                        
                         -- Search by Priority Slots (Slot 1 to 7)
-                        for _, priorityName in ipairs(Config.PrioritySlots) do
+                        for _, priorityName in ipairs(Config.PrioritySlots or {}) do
                             if priorityName and priorityName ~= "" then
                                 for pName, amt in pairs(ownedPacks) do
                                     if amt > 0 and not matchedPacks[pName] and string.find(pName:lower(), priorityName:lower()) then
@@ -3923,18 +3922,26 @@ function startPacksThread()
                             end
                         end
                         
-                        -- If we have no priority packs, fall back to Hina Hub selections or manual target
+                        -- Fallback to SelectedPacks, HinaHub, or any owned pack if no priority matches
                         if totalEligibleCount == 0 then
                             for pName, amt in pairs(ownedPacks) do
                                 if amt > 0 then
                                     local isMatch = false
                                     if Config.SyncHinaHub and hasHinaSelections then
                                         isMatch = hinaSelections[pName] == true
+                                    elseif Config.SelectedPacks and next(Config.SelectedPacks) then
+                                        for selName, isSel in pairs(Config.SelectedPacks) do
+                                            if isSel and (selName:lower() == "all" or string.find(pName:lower(), selName:lower())) then
+                                                isMatch = true
+                                                break
+                                            end
+                                        end
                                     else
-                                        isMatch = Config.SelectedPacks[pName] == true
+                                        isMatch = true -- default: place any owned pack
                                     end
                                     
-                                    if isMatch then
+                                    if isMatch and not matchedPacks[pName] then
+                                        matchedPacks[pName] = true
                                         table.insert(eligiblePacks, {name = pName, amount = amt})
                                         totalEligibleCount = totalEligibleCount + amt
                                     end
@@ -3972,19 +3979,17 @@ function startPacksThread()
                                 if not Config.AutoPlacePacks then break end
                                 local pack = eligiblePacks[currentPackIdx]
                                 if pack.amount > 0 then
-                                    -- Equip pack to hotbar slot 1 on server
                                     ReplicatedStorage.Remotes.Card:FireServer("Hotbar", "1", pack.name)
                                     task.wait(0.05)
                                     ReplicatedStorage.Remotes.Card:FireServer("Equip", pack.name)
                                     task.wait(0.05)
-                                    -- Place the pack
                                     ReplicatedStorage.Remotes.Card:FireServer("Place", pack.name)
                                     task.wait(0.05)
                                     ReplicatedStorage.Remotes.Card:FireServer("Unequip", pack.name)
                                     
                                     pack.amount = pack.amount - 1
                                     placedCount = placedCount + 1
-                                    task.wait(0.08) -- Rapid placement!
+                                    task.wait(0.08)
                                 else
                                     currentPackIdx = currentPackIdx + 1
                                 end
@@ -4008,7 +4013,6 @@ function startPacksThread()
                             local threshold = Config.UseWhenPackPlaced or 70
                             local shouldApply = placedCount >= threshold or (placedCount > 0 and not Config.AutoPlacePacks)
                             
-                            -- Count ready packs to check stop limit
                             local readyCount = 0
                             local hasHatching = false
                             for _, pack in ipairs(plot.Packs:GetChildren()) do
@@ -4037,7 +4041,6 @@ function startPacksThread()
                                     local consumables = ReplicatedData.GetData("Consumables") or {}
                                     local targetPotion = nil
                                     
-                                    -- Check checkboxes in GUI for selected potions (LOWEST TIER FIRST: HatchTime1 -> HatchTime2 -> HatchTime3)
                                     local ht1Selected = Config.SelectedPotions and Config.SelectedPotions["HatchTime1"] == true
                                     local ht2Selected = Config.SelectedPotions and Config.SelectedPotions["HatchTime2"] == true
                                     local ht3Selected = Config.SelectedPotions and Config.SelectedPotions["HatchTime3"] == true
@@ -4060,7 +4063,7 @@ function startPacksThread()
                         end
                     end
                     
-                    -- 3. Auto Open Packs
+                    -- 3. Auto Open Packs & Bundles
                     if Config.AutoOpenPacks and plot:FindFirstChild("Packs") then
                         local readyPacks = {}
                         for _, pack in ipairs(plot.Packs:GetChildren()) do
@@ -4074,6 +4077,7 @@ function startPacksThread()
                         if #readyPacks >= targetReadyOpen then
                             local char = player.Character
                             local root = char and char:FindFirstChild("HumanoidRootPart")
+                            local originalCFrame = root and root.CFrame
                             
                             for _, packData in ipairs(readyPacks) do
                                 if not Config.AutoOpenPacks then break end
@@ -4082,9 +4086,9 @@ function startPacksThread()
                                 
                                 if prompt and prompt.Enabled and string.find(prompt.ActionText, "Open") then
                                     if not Config.TPCollect then
-                                        -- Legit walk normally to the ready card model
                                         setDebug("Walking to open pack: " .. pack.Name)
                                         walkTo(pack:GetPivot().Position)
+                                        task.wait(0.2)
                                         pcall(function()
                                             prompt.HoldDuration = 0
                                             prompt.RequiresLineOfSight = false
@@ -4094,33 +4098,29 @@ function startPacksThread()
                                                 prompt:InputBegan(player)
                                             end
                                         end)
-                                        task.wait(0.3)
+                                        task.wait(0.2)
                                     else
-                                        -- Teleport / Remote opening
-                                        if fireproximityprompt then
-                                            setDebug("Opening pack remotely: " .. pack.Name)
-                                            pcall(function()
-                                                prompt.HoldDuration = 0
-                                                prompt.RequiresLineOfSight = false
-                                                fireproximityprompt(prompt)
-                                            end)
-                                            task.wait(0.08)
-                                        elseif root then
-                                            setDebug("Teleporting to open pack: " .. pack.Name)
-                                            local oldCFrame = root.CFrame
-                                            root.CFrame = pack:GetPivot()
-                                            task.wait(0.25)
-                                            pcall(function()
-                                                prompt.HoldDuration = 0
-                                                prompt.RequiresLineOfSight = false
-                                                prompt:InputBegan(player)
-                                            end)
-                                            task.wait(0.2)
-                                            root.CFrame = oldCFrame
-                                            task.wait(0.25)
+                                        setDebug("Opening pack: " .. pack.Name)
+                                        if root then
+                                            root.CFrame = pack:GetPivot() + Vector3.new(0, 2, 0)
+                                            task.wait(0.15)
                                         end
+                                        pcall(function()
+                                            prompt.HoldDuration = 0
+                                            prompt.RequiresLineOfSight = false
+                                            if fireproximityprompt then
+                                                fireproximityprompt(prompt)
+                                            end
+                                            prompt:InputBegan(player)
+                                        end)
+                                        task.wait(0.15)
                                     end
                                 end
+                            end
+                            
+                            if Config.TPCollect and originalCFrame and root then
+                                root.CFrame = originalCFrame
+                                task.wait(0.1)
                             end
                         end
                     end
