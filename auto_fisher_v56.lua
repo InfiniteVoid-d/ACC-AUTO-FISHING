@@ -3036,7 +3036,7 @@ function startAutoCollectLoop()
                 if CardRemote then
                     setDebug("Starting binder page sweep...")
                     
-                    local maxPages = 31 -- dynamic resolution with 31 default fallback
+                    local maxPages = 35 -- dynamic resolution with 35 default fallback
                     pcall(function()
                         local maxVal = ReplicatedData.GetData("MaxPages") or ReplicatedData.GetData("BinderPages") or ReplicatedData.GetData("MaxBinderPages") or ReplicatedData.GetData("Pages")
                         if maxVal and type(maxVal) == "number" then
@@ -3057,7 +3057,7 @@ function startAutoCollectLoop()
                             end
                         end
                     end)
-                    maxPages = math.max(31, maxPages) -- enforce at least 31
+                    maxPages = math.max(35, maxPages) -- enforce at least 35
                     
                     for page = 1, maxPages do
                         if not Config.AutoCollect then break end
