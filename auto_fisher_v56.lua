@@ -4237,9 +4237,13 @@ function startAutoCollectTokensLoop()
                 pcall(function()
                     local summerRemote = ReplicatedStorage.Remotes:FindFirstChild("Summer")
                     if summerRemote then
-                        for _, token in ipairs(game:GetService("CollectionService"):GetTagged("SummerTokens")) do
+                        local summerTag = player.UserId .. "-Object"
+                        for _, token in ipairs(game:GetService("CollectionService"):GetTagged(summerTag)) do
                             if token:GetAttribute("Collected") ~= true then
                                 token:SetAttribute("Collected", true)
+                                if token:IsA("BasePart") then
+                                    token.Transparency = 1
+                                end
                                 pcall(function() summerRemote:FireServer("Collect", token.Name) end)
                             end
                         end
