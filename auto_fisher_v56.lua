@@ -5181,6 +5181,23 @@ function handleEscape(reason)
     if autoFishing then doCast() end
 end
 
+local function stopFishingAnimations()
+    pcall(function()
+        local player = Players.LocalPlayer
+        local char = player and player.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        local animator = hum and hum:FindFirstChildOfClass("Animator")
+        if animator then
+            for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+                local animId = tostring(track.Animation and track.Animation.AnimationId or "")
+                if animId:find("Fish") or animId:find("1092126") then
+                    track:Stop(0)
+                end
+            end
+        end
+    end)
+end
+
 local function blatantFishingLoop()
     local FishRemote = ReplicatedStorage.Remotes:FindFirstChild("Fish")
     while autoFishing and Config.Mode == "Blatant" and Config.BlatantStrategy == "blatant" do
@@ -5213,7 +5230,8 @@ local function blatantFishingLoop()
 
         if not autoFishing or Config.Mode ~= "Blatant" or Config.BlatantStrategy ~= "blatant" then break end
 
-        -- Step 3: Bite Triggered! Fire 2nd Overlapping Cast & 10x Instant Catch Burst
+        -- Step 3: Bite Triggered! Instant Animation Cancel + 2nd Cast & 10x Catch Burst
+        stopFishingAnimations()
         setStatus("🔥 Overlapping Cast & 10x Reel Burst!", Color3.fromRGB(0, 255, 150))
         pcall(function()
             if FishRemote then
@@ -5230,6 +5248,7 @@ local function blatantFishingLoop()
             end)
             task.wait(0.005)
         end
+        stopFishingAnimations()
 
         -- Step 4: Rapid Cycle Micro Cooldown
         task.wait(Config.BlatantRecastDelay or 0.05)
