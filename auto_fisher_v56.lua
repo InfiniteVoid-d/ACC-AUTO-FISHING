@@ -5224,21 +5224,23 @@ local function blatantFishingLoop()
             if FishRemote then
                 conn = FishRemote.OnClientEvent:Connect(function(evt)
                     if evt == "StartFishing" then
-                        -- Fire 2nd Overlapping Cast
-                        pcall(function() FishRemote:FireServer("CastRod", Config.BlatantCastValue or 1.0) end)
-                        
-                        -- Fire FishCaught burst instantly
-                        for i = 1, 5 do
-                            pcall(function() FishRemote:FireServer("FishCaught") end)
-                        end
                         bit = true
+                        task.spawn(function()
+                            task.wait(0.04)
+                            -- 1. Fire 2nd Overlapping Cast
+                            pcall(function() FishRemote:FireServer("CastRod", Config.BlatantCastValue or 1.0) end)
+                            -- 2. Fire FishCaught burst to validate catch
+                            for i = 1, 5 do
+                                pcall(function() FishRemote:FireServer("FishCaught") end)
+                            end
+                        end)
                     end
                 end)
             end
         end)
 
         local startW = tick()
-        while not bit and (tick() - startW) < 3.0 and autoFishing do
+        while not bit and (tick() - startW) < 3.5 and autoFishing do
             task.wait(0.005)
         end
         if conn then pcall(function() conn:Disconnect() end) end
@@ -5246,7 +5248,7 @@ local function blatantFishingLoop()
         if not autoFishing or Config.Mode ~= "Blatant" or Config.BlatantStrategy ~= "blatant" then break end
 
         -- Step 3: Rapid Recast Cooldown
-        task.wait(Config.BlatantRecastDelay or 0.05)
+        task.wait(Config.BlatantRecastDelay or 0.1)
     end
     enableAnimationKiller(false)
 end
