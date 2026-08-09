@@ -5184,44 +5184,36 @@ end
 local function blatantFishingLoop()
     local FishRemote = ReplicatedStorage.Remotes:FindFirstChild("Fish")
     while autoFishing and Config.Mode == "Blatant" and Config.BlatantStrategy == "blatant" do
-        -- Step 1: Fire CastRod immediately
+        -- Step 1: Overlapping Cast #1
         pcall(function()
             if FishRemote then
                 FishRemote:FireServer("CastRod", Config.BlatantCastValue or 1.0)
             end
         end)
-        setStatus("🔥 BLT: Cast Sent!", Color3.fromRGB(255, 214, 0))
+        task.wait(0.04)
 
-        -- Step 2: Zero-Latency Event Listener with Overlapping 2nd Cast & Instant 5x Burst
-        local caught = false
-        local conn
+        -- Step 2: Overlapping Cast #2
         pcall(function()
             if FishRemote then
-                conn = FishRemote.OnClientEvent:Connect(function(evt)
-                    if evt == "StartFishing" then
-                        -- Fire parallel 2nd cast immediately on bite (50% faster cycle)
-                        pcall(function() FishRemote:FireServer("CastRod", Config.BlatantCastValue or 1.0) end)
-                        
-                        -- Instant 5x Reel Burst executed directly in callback
-                        for i = 1, 5 do
-                            pcall(function() FishRemote:FireServer("FishCaught") end)
-                        end
-                        caught = true
-                    end
-                end)
+                FishRemote:FireServer("CastRod", Config.BlatantCastValue or 1.0)
             end
         end)
+        setStatus("🔥 2x Overlapping Cast!", Color3.fromRGB(255, 214, 0))
+        task.wait(0.06)
 
-        local startW = tick()
-        while not caught and (tick() - startW) < 2.5 and autoFishing do
-            task.wait(0.005)
+        -- Step 3: Rapid 5x Reel Spam Burst
+        setStatus("🔥 5x Reel Spam Catching...", Color3.fromRGB(0, 255, 150))
+        for i = 1, 5 do
+            pcall(function()
+                if FishRemote then
+                    FishRemote:FireServer("FishCaught")
+                end
+            end)
+            task.wait(0.01)
         end
-        if conn then pcall(function() conn:Disconnect() end) end
 
-        if not autoFishing or Config.Mode ~= "Blatant" or Config.BlatantStrategy ~= "blatant" then break end
-
-        -- Step 3: Zero-delay instant recast
-        task.wait(0.001)
+        -- Step 4: Rapid Cycle Micro Cooldown
+        task.wait(Config.BlatantRecastDelay or 0.05)
     end
 end
 
