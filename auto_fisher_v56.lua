@@ -5192,39 +5192,36 @@ local function blatantFishingLoop()
         end)
         setStatus("🔥 BLT: Cast Sent!", Color3.fromRGB(255, 214, 0))
 
-        -- Step 2: Listen for StartFishing / Bite via remote event or audio
-        local bit = false
+        -- Step 2: Zero-Latency Event Listener (Fires 5x Reel Burst instantly on microsecond arrival)
+        local caught = false
         local conn
         pcall(function()
             if FishRemote then
                 conn = FishRemote.OnClientEvent:Connect(function(evt)
                     if evt == "StartFishing" then
-                        bit = true
+                        -- Instant 5x Reel Burst executed directly in callback (Zero Latency)
+                        for i = 1, 5 do
+                            pcall(function()
+                                if FishRemote then
+                                    FishRemote:FireServer("FishCaught")
+                                end
+                            end)
+                        end
+                        caught = true
                     end
                 end)
             end
         end)
 
         local startW = tick()
-        while not bit and (tick() - startW) < 2.5 and autoFishing do
+        while not caught and (tick() - startW) < 2.5 and autoFishing do
             task.wait(0.01)
         end
         if conn then pcall(function() conn:Disconnect() end) end
 
         if not autoFishing or Config.Mode ~= "Blatant" or Config.BlatantStrategy ~= "blatant" then break end
 
-        -- Step 3: Instant 5x Reel Burst
-        setStatus("🔥 5x Reel Spam Catching...", Color3.fromRGB(0, 255, 150))
-        for i = 1, 5 do
-            pcall(function()
-                if FishRemote then
-                    FishRemote:FireServer("FishCaught")
-                end
-            end)
-            task.wait(0.01)
-        end
-
-        -- Step 4: Instant 0.01s Micro Recast Cooldown
+        -- Step 3: Instant 0.01s Micro Recast Cooldown
         task.wait(0.01)
     end
 end
