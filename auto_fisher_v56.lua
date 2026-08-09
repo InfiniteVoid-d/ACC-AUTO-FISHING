@@ -5217,18 +5217,17 @@ local function blatantFishingLoop()
         end)
         setStatus("🔥 BLT: Rod Cast!", Color3.fromRGB(255, 214, 0))
 
-        -- Step 2: Instant Microsecond Callback (Fire 2nd Cast & 10x Reel Burst on exact event arrival)
+        -- Step 2: Instant Microsecond Callback (Fire 2nd Cast & Instant Catch Burst on exact event arrival)
         local bit = false
         local conn
         pcall(function()
             if FishRemote then
                 conn = FishRemote.OnClientEvent:Connect(function(evt)
                     if evt == "StartFishing" then
-                        -- 1. Overlapping 2nd Cast
+                        -- Fire 2nd Overlapping Cast
                         pcall(function() FishRemote:FireServer("CastRod", Config.BlatantCastValue or 1.0) end)
-                        -- 2. Server Catch Validation Micro-Delay (0.12s prevents server escape check)
-                        task.wait(0.12)
-                        -- 3. Zero-latency Instant Catch Burst
+                        
+                        -- Fire FishCaught burst instantly
                         for i = 1, 5 do
                             pcall(function() FishRemote:FireServer("FishCaught") end)
                         end
@@ -5240,13 +5239,13 @@ local function blatantFishingLoop()
 
         local startW = tick()
         while not bit and (tick() - startW) < 3.0 and autoFishing do
-            task.wait(0.001)
+            task.wait(0.005)
         end
         if conn then pcall(function() conn:Disconnect() end) end
 
         if not autoFishing or Config.Mode ~= "Blatant" or Config.BlatantStrategy ~= "blatant" then break end
 
-        -- Step 3: Rapid Cycle Micro Cooldown
+        -- Step 3: Rapid Recast Cooldown
         task.wait(Config.BlatantRecastDelay or 0.05)
     end
     enableAnimationKiller(false)
