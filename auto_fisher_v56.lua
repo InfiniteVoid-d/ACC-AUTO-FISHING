@@ -5226,8 +5226,10 @@ local function blatantFishingLoop()
                     if evt == "StartFishing" then
                         -- 1. Overlapping 2nd Cast
                         pcall(function() FishRemote:FireServer("CastRod", Config.BlatantCastValue or 1.0) end)
-                        -- 2. Zero-latency 10x Instant Catch Burst
-                        for i = 1, 10 do
+                        -- 2. Server Catch Validation Micro-Delay (0.12s prevents server escape check)
+                        task.wait(0.12)
+                        -- 3. Zero-latency Instant Catch Burst
+                        for i = 1, 5 do
                             pcall(function() FishRemote:FireServer("FishCaught") end)
                         end
                         bit = true
