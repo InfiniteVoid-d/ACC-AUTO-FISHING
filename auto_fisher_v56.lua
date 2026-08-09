@@ -135,6 +135,7 @@ Config = {
     
     BlatantRecastDelay = 0.05,   -- Recast delay between catches (default 0.05s)
     BlatantCastValue = 1.0,      -- Perfect cast
+    RepeatCast = true,           -- Repeat Cast (Double Cast) on bite
     
     -- Auto Sell Duplicate Fish
     AutoSellDupes = false,
@@ -5110,6 +5111,12 @@ function handleStartFishing(fishName)
                 _G.BiteConnection:Disconnect()
                 _G.BiteConnection = nil
                 
+                -- Repeat Cast (Double Cast): cast second rod immediately on bite before catching first!
+                if Config.RepeatCast then
+                    setDebug("Repeat Cast: Firing second cast on bite...")
+                    pcall(Fish.FireServer, Fish, "CastRod", Config.BlatantCastValue or 1.0)
+                end
+
                 setStatus(strat == "instant" and "🚀 INS: Catching..." or "🔥 BLT: Catching...", Color3.fromRGB(0, 255, 150))
                 setDebug("Bite detected! Waiting catch delay...")
                 task.wait(Config.InstantCatchDelay)
