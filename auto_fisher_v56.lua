@@ -74,7 +74,7 @@ pcall(function()
             -- Blocker 2: Auto-fishing escape blocker
             local selfName = pcall(function() return self.Name end) and self.Name
             if selfName and tostring(selfName):lower() == "fish" and (method == "FireServer" or method == "fireServer") and args[1] == "FishEscaped" then
-                if autoFishing and Config and Config.BlatantStrategy == "instant" then
+                if autoFishing and Config and (Config.BlatantStrategy == "instant" or Config.BlatantStrategy == "blatant") then
                     return
                 end
             end
@@ -5201,15 +5201,15 @@ local function blatantFishingLoop()
         setStatus("🔥 2x Overlapping Cast!", Color3.fromRGB(255, 214, 0))
         task.wait(0.06)
 
-        -- Step 3: Rapid 5x Reel Spam Burst
-        setStatus("🔥 5x Reel Spam Catching...", Color3.fromRGB(0, 255, 150))
-        for i = 1, 5 do
+        -- Step 3: Rapid 10x Reel Spam Burst (Zero Escapes)
+        setStatus("🔥 10x Reel Spam Catching...", Color3.fromRGB(0, 255, 150))
+        for i = 1, 10 do
             pcall(function()
                 if FishRemote then
                     FishRemote:FireServer("FishCaught")
                 end
             end)
-            task.wait(0.01)
+            task.wait(0.005)
         end
 
         -- Step 4: Rapid Cycle Micro Cooldown
