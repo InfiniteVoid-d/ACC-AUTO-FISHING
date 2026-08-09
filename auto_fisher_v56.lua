@@ -5192,20 +5192,19 @@ local function blatantFishingLoop()
         end)
         setStatus("🔥 BLT: Cast Sent!", Color3.fromRGB(255, 214, 0))
 
-        -- Step 2: Zero-Latency Event Listener (Fires 5x Reel Burst instantly on microsecond arrival)
+        -- Step 2: Zero-Latency Event Listener with Overlapping 2nd Cast & Instant 5x Burst
         local caught = false
         local conn
         pcall(function()
             if FishRemote then
                 conn = FishRemote.OnClientEvent:Connect(function(evt)
                     if evt == "StartFishing" then
-                        -- Instant 5x Reel Burst executed directly in callback (Zero Latency)
+                        -- Fire parallel 2nd cast immediately on bite (50% faster cycle)
+                        pcall(function() FishRemote:FireServer("CastRod", Config.BlatantCastValue or 1.0) end)
+                        
+                        -- Instant 5x Reel Burst executed directly in callback
                         for i = 1, 5 do
-                            pcall(function()
-                                if FishRemote then
-                                    FishRemote:FireServer("FishCaught")
-                                end
-                            end)
+                            pcall(function() FishRemote:FireServer("FishCaught") end)
                         end
                         caught = true
                     end
@@ -5215,14 +5214,14 @@ local function blatantFishingLoop()
 
         local startW = tick()
         while not caught and (tick() - startW) < 2.5 and autoFishing do
-            task.wait(0.01)
+            task.wait(0.005)
         end
         if conn then pcall(function() conn:Disconnect() end) end
 
         if not autoFishing or Config.Mode ~= "Blatant" or Config.BlatantStrategy ~= "blatant" then break end
 
-        -- Step 3: Instant 0.01s Micro Recast Cooldown
-        task.wait(0.01)
+        -- Step 3: Zero-delay instant recast
+        task.wait(0.001)
     end
 end
 
