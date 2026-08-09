@@ -4199,28 +4199,22 @@ function startAutoCollectTokensLoop()
                     and workspace.Items:FindFirstChild("Tokens")
                     and workspace.Items.Tokens:FindFirstChild("Client")
 
-                local activeNames = {}
                 pcall(function()
                     for _, child in ipairs(game:GetService("CollectionService"):GetTagged(tag)) do
-                        activeNames[child.Name] = true
-                        if not collectedTokens[child.Name] then
-                            collectedTokens[child.Name] = true
+                        if child:GetAttribute("Collected") ~= true then
+                            child:SetAttribute("Collected", true)
                             
                             local visual = clientTokens and clientTokens:FindFirstChild(child.Name)
                             if visual and visual:IsA("BasePart") then
                                 visual.Transparency = 1
+                            elseif child:IsA("BasePart") then
+                                child.Transparency = 1
                             end
                             
                             pcall(function() ReplicatedStorage.Remotes.Card:FireServer("CollectToken", child.Name) end)
                         end
                     end
                 end)
-                
-                for name in pairs(collectedTokens) do
-                    if not activeNames[name] then
-                        collectedTokens[name] = nil
-                    end
-                end
                 
                 pcall(function()
                     for _, item in ipairs(game:GetService("CollectionService"):GetTagged("Potions")) do
