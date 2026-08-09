@@ -5149,7 +5149,10 @@ function handleCatch(eventType, fishName)
     setStatus(label, Color3.fromRGB(100, 220, 255))
     setDebug("Catch confirmed")
 
-    recast()
+    -- Continuous Pipelined Chain: If RepeatCast is ON, next bobber is already in water counting down!
+    if not Config.RepeatCast then
+        recast()
+    end
 end
 
 function handleEscape(reason)
