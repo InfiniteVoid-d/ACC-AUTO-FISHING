@@ -5252,23 +5252,33 @@ function startAutoFish()
     connection = Fish.OnClientEvent:Connect(function(eventType, fishName, amount)
         if not autoFishing then return end
 
-        if eventType == "StartFishing" then
-            handleStartFishing(fishName)
-        elseif eventType == "FishCaught" or eventType == "FishClaimed" then
+        if eventType == "FishCaught" or eventType == "FishClaimed" then
             fishCaught = fishCaught + 1
             updateStats()
             task.spawn(function()
                 pcall(checkAndSendFishWebhook, fishName)
             end)
-            handleCatch(eventType, fishName)
-        elseif eventType == "FishEscaped" then
-            handleEscape(fishName)
-        elseif eventType == "EquipRod" or eventType == "OpenTreasure" then
-            setDebug("Event: " .. tostring(eventType))
-        elseif eventType == "Sold" then
-            setDebug("Duplicate Sold successfully!")
+        end
+
+        if Config.Mode == "Blatant" and Config.BlatantStrategy == "blatant" then
+            -- In Standalone Blatant Loop mode, blatantFishingLoop handles casting & catching without interference
+            if eventType == "FishEscaped" then
+                setDebug("Fish escaped: " .. tostring(fishName or ""))
+            end
         else
-            setDebug("Unknown: " .. tostring(eventType))
+            if eventType == "StartFishing" then
+                handleStartFishing(fishName)
+            elseif eventType == "FishCaught" or eventType == "FishClaimed" then
+                handleCatch(eventType, fishName)
+            elseif eventType == "FishEscaped" then
+                handleEscape(fishName)
+            elseif eventType == "EquipRod" or eventType == "OpenTreasure" then
+                setDebug("Event: " .. tostring(eventType))
+            elseif eventType == "Sold" then
+                setDebug("Duplicate Sold successfully!")
+            else
+                setDebug("Unknown: " .. tostring(eventType))
+            end
         end
     end)
 
