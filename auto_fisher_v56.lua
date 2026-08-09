@@ -5181,22 +5181,33 @@ function handleEscape(reason)
     if autoFishing then doCast() end
 end
 
-local function stopFishingAnimations()
-    pcall(function()
-        local player = Players.LocalPlayer
-        local char = player and player.Character
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
-        local animator = hum and hum:FindFirstChildOfClass("Animator") or hum
-        if animator then
-            for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
-                track:Stop(0)
+local animConn
+local function enableAnimationKiller(enable)
+    if animConn then pcall(function() animConn:Disconnect() end); animConn = nil end
+    if enable then
+        pcall(function()
+            local player = Players.LocalPlayer
+            local char = player and player.Character
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            local animator = hum and (hum:FindFirstChildOfClass("Animator") or hum)
+            if animator then
+                for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+                    pcall(function() track:Stop(0) end)
+                end
+                animConn = animator.AnimationPlayed:Connect(function(track)
+                    pcall(function()
+                        track:Stop(0)
+                        track:AdjustSpeed(0)
+                    end)
+                end)
             end
-        end
-    end)
+        end)
+    end
 end
 
 local function blatantFishingLoop()
     local FishRemote = ReplicatedStorage.Remotes:FindFirstChild("Fish")
+    enableAnimationKiller(true)
     while autoFishing and Config.Mode == "Blatant" and Config.BlatantStrategy == "blatant" do
         -- Step 1: Initial Cast
         pcall(function()
@@ -5227,15 +5238,13 @@ local function blatantFishingLoop()
 
         if not autoFishing or Config.Mode ~= "Blatant" or Config.BlatantStrategy ~= "blatant" then break end
 
-        -- Step 3: Bite Triggered! Instant Animation Cancel + 2nd Cast & 10x Catch Burst
-        stopFishingAnimations()
+        -- Step 3: Bite Triggered! Instant 2nd Overlapping Cast & 10x Reel Burst
         setStatus("🔥 Overlapping Cast & 10x Reel Burst!", Color3.fromRGB(0, 255, 150))
         pcall(function()
             if FishRemote then
                 FishRemote:FireServer("CastRod", Config.BlatantCastValue or 1.0)
             end
         end)
-        task.wait(0.01)
 
         for i = 1, 10 do
             pcall(function()
@@ -5243,13 +5252,13 @@ local function blatantFishingLoop()
                     FishRemote:FireServer("FishCaught")
                 end
             end)
-            task.wait(0.005)
+            task.wait(0.001)
         end
-        stopFishingAnimations()
 
         -- Step 4: Rapid Cycle Micro Cooldown
         task.wait(Config.BlatantRecastDelay or 0.05)
     end
+    enableAnimationKiller(false)
 end
 
 function startAutoFish()
