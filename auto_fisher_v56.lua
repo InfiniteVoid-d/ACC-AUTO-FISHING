@@ -5131,10 +5131,11 @@ function handleStartFishing(fishName)
                 end
                 if not autoFishing then return end
                 
-                -- 2. Spam Reel 5x for Instant Server Catch Validation
+                -- 2. Spam Reel 5x with 0.01s spacing for Instant Server Catch Validation
                 setDebug("Spamming FishCaught 5x...")
-                for _ = 1, 5 do
+                for i = 1, 5 do
                     pcall(Fish.FireServer, Fish, "FishCaught")
+                    task.wait(0.01)
                 end
             end)
         elseif strat == "turbo" then
