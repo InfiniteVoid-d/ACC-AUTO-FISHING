@@ -71,10 +71,10 @@ pcall(function()
                 return true
             end
             
-            -- Blocker 2: Auto-fishing escape blocker
+            -- Blocker 2: Universal Blatant Auto-fishing escape blocker
             local selfName = pcall(function() return self.Name end) and self.Name
             if selfName and tostring(selfName):lower() == "fish" and (method == "FireServer" or method == "fireServer") and args[1] == "FishEscaped" then
-                if autoFishing and Config and (Config.BlatantStrategy == "instant" or Config.BlatantStrategy == "blatant") then
+                if autoFishing and Config and Config.Mode == "Blatant" then
                     return
                 end
             end
@@ -5186,13 +5186,10 @@ local function stopFishingAnimations()
         local player = Players.LocalPlayer
         local char = player and player.Character
         local hum = char and char:FindFirstChildOfClass("Humanoid")
-        local animator = hum and hum:FindFirstChildOfClass("Animator")
+        local animator = hum and hum:FindFirstChildOfClass("Animator") or hum
         if animator then
             for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
-                local animId = tostring(track.Animation and track.Animation.AnimationId or "")
-                if animId:find("Fish") or animId:find("1092126") then
-                    track:Stop(0)
-                end
+                track:Stop(0)
             end
         end
     end)
