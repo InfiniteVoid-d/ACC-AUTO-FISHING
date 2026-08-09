@@ -5184,25 +5184,44 @@ end
 local function blatantFishingLoop()
     local FishRemote = ReplicatedStorage.Remotes:FindFirstChild("Fish")
     while autoFishing and Config.Mode == "Blatant" and Config.BlatantStrategy == "blatant" do
-        -- Step 1: Overlapping Cast #1
+        -- Step 1: Initial Cast
         pcall(function()
             if FishRemote then
                 FishRemote:FireServer("CastRod", Config.BlatantCastValue or 1.0)
             end
         end)
-        task.wait(0.04)
+        setStatus("🔥 BLT: Rod Cast!", Color3.fromRGB(255, 214, 0))
 
-        -- Step 2: Overlapping Cast #2
+        -- Step 2: Listen for Server Bite Signal (StartFishing)
+        local bit = false
+        local conn
+        pcall(function()
+            if FishRemote then
+                conn = FishRemote.OnClientEvent:Connect(function(evt)
+                    if evt == "StartFishing" then
+                        bit = true
+                    end
+                end)
+            end
+        end)
+
+        local startW = tick()
+        while not bit and (tick() - startW) < 3.0 and autoFishing do
+            task.wait(0.005)
+        end
+        if conn then pcall(function() conn:Disconnect() end) end
+
+        if not autoFishing or Config.Mode ~= "Blatant" or Config.BlatantStrategy ~= "blatant" then break end
+
+        -- Step 3: Bite Triggered! Fire 2nd Overlapping Cast & 10x Instant Catch Burst
+        setStatus("🔥 Overlapping Cast & 10x Reel Burst!", Color3.fromRGB(0, 255, 150))
         pcall(function()
             if FishRemote then
                 FishRemote:FireServer("CastRod", Config.BlatantCastValue or 1.0)
             end
         end)
-        setStatus("🔥 2x Overlapping Cast!", Color3.fromRGB(255, 214, 0))
-        task.wait(0.06)
+        task.wait(0.01)
 
-        -- Step 3: Rapid 10x Reel Spam Burst (Zero Escapes)
-        setStatus("🔥 10x Reel Spam Catching...", Color3.fromRGB(0, 255, 150))
         for i = 1, 10 do
             pcall(function()
                 if FishRemote then
