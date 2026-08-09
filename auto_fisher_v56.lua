@@ -5181,6 +5181,44 @@ function handleEscape(reason)
     if autoFishing then doCast() end
 end
 
+local function blatantFishingLoop()
+    while autoFishing and Config.Mode == "Blatant" and Config.BlatantStrategy == "blatant" do
+        -- Step 1: Rapid fire 2 parallel casts (overlapping)
+        pcall(function()
+            pcall(Fish.FireServer, Fish, "CastRod", Config.BlatantCastValue or 1.0)
+            task.wait(0.05)
+            pcall(Fish.FireServer, Fish, "CastRod", Config.BlatantCastValue or 1.0)
+        end)
+        setStatus("🔥 2x Parallel Cast Sent!", Color3.fromRGB(255, 214, 0))
+
+        -- Step 2: Wait for fish to bite
+        local bit = false
+        local conn
+        pcall(function()
+            local FishAlert = ReplicatedStorage:WaitForChild("Assets"):WaitForChild("Sounds"):WaitForChild("Fish"):WaitForChild("FishAlert")
+            conn = FishAlert.Played:Connect(function() bit = true end)
+        end)
+
+        local startW = tick()
+        while not bit and (tick() - startW) < 3.5 and autoFishing do
+            task.wait(0.01)
+        end
+        if conn then pcall(function() conn:Disconnect() end) end
+
+        if not autoFishing or Config.Mode ~= "Blatant" or Config.BlatantStrategy ~= "blatant" then break end
+
+        -- Step 3: Spam reel 5x to instant catch
+        setStatus("🔥 5x Reel Spam Catching...", Color3.fromRGB(0, 255, 150))
+        for i = 1, 5 do
+            pcall(Fish.FireServer, Fish, "FishCaught")
+            task.wait(0.01)
+        end
+
+        -- Step 4: Short cooldown (50% faster)
+        task.wait((Config.BlatantRecastDelay or 0.05) * 0.5)
+    end
+end
+
 function startAutoFish()
     pcall(function()
         if FishHandler and not FishHandler.InFishingArea then
@@ -5228,11 +5266,13 @@ function startAutoFish()
         end
     end)
 
-
-
     task.spawn(function()
         task.wait(0.3)
-        doCast()
+        if Config.Mode == "Blatant" and Config.BlatantStrategy == "blatant" then
+            blatantFishingLoop()
+        else
+            doCast()
+        end
     end)
 
     safetyThread = task.spawn(function()
