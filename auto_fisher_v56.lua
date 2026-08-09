@@ -147,6 +147,9 @@ Config = {
     -- Auto Collect spawned tokens (Grade & Travel tokens)
     AutoCollectTokens = true,
 
+    -- Auto Collect Summer Event Tokens
+    AutoCollectSummerTokens = true,
+
     -- Auto Collect Dragon Balls (Spawns + Card Market VII auto-buy)
     AutoCollectDragonBalls = true,
 
@@ -1440,19 +1443,26 @@ createGridToggle(autoCard, "🪙 Collect Map Tokens", UDim2.new(0, 0, 0, 110), U
     end
 end)
 
-createGridToggle(autoCard, "🏺 Auto Craft Relics", UDim2.new(0, 0, 0, 128), UDim2.new(1, 0, 0, 18), Config.AutoRelics, function(val)
+createGridToggle(autoCard, "☀️ Collect Summer Tokens", UDim2.new(0, 0, 0, 128), UDim2.new(1, 0, 0, 18), Config.AutoCollectSummerTokens, function(val)
+    Config.AutoCollectSummerTokens = val
+    if autoFishing then
+        startAutoCollectTokensLoop()
+    end
+end)
+
+createGridToggle(autoCard, "🏺 Auto Craft Relics", UDim2.new(0, 0, 0, 146), UDim2.new(1, 0, 0, 18), Config.AutoRelics, function(val)
     Config.AutoRelics = val
     if val then startAutoRelicsLoop() else cancelAutoRelicsThread() end
 end)
 
-createGridToggle(autoCard, "🐉 Collect Dragon Balls", UDim2.new(0, 0, 0, 146), UDim2.new(1, 0, 0, 18), Config.AutoCollectDragonBalls, function(val)
+createGridToggle(autoCard, "🐉 Collect Dragon Balls", UDim2.new(0, 0, 0, 164), UDim2.new(1, 0, 0, 18), Config.AutoCollectDragonBalls, function(val)
     Config.AutoCollectDragonBalls = val
     if autoFishing then
         startAutoCollectTokensLoop()
     end
 end)
 
-createGridToggle(autoCard, "🐉 Auto Wish (Shenron)", UDim2.new(0, 0, 0, 164), UDim2.new(1, 0, 0, 18), Config.AutoWish, function(val)
+createGridToggle(autoCard, "🐉 Auto Wish (Shenron)", UDim2.new(0, 0, 0, 182), UDim2.new(1, 0, 0, 18), Config.AutoWish, function(val)
     Config.AutoWish = val
     if autoFishing then
         startAutoCollectTokensLoop()
@@ -1462,7 +1472,7 @@ end)
 -- Wish Type Selection Row
 local wishRow = Instance.new("Frame")
 wishRow.Size = UDim2.new(1, -16, 0, 20)
-wishRow.Position = UDim2.new(0, 0, 0, 184)
+wishRow.Position = UDim2.new(0, 0, 0, 202)
 wishRow.BackgroundTransparency = 1
 wishRow.Parent = autoCard
 
@@ -4174,14 +4184,14 @@ function startPacksThread()
 end
 
 function startAutoCollectTokensLoop()
-    local anyActive = Config.AutoCollectTokens or Config.AutoCollectDragonBalls or Config.AutoWish or Config.AutoRollPets or Config.AutoRaid or Config.AutoVoyage or Config.AutoPetQuests or Config.AutoCook or Config.AutoUpgradeRod or Config.NotifyMerchant
+    local anyActive = Config.AutoCollectTokens or Config.AutoCollectSummerTokens or Config.AutoCollectDragonBalls or Config.AutoWish or Config.AutoRollPets or Config.AutoRaid or Config.AutoVoyage or Config.AutoPetQuests or Config.AutoCook or Config.AutoUpgradeRod or Config.NotifyMerchant
     if not anyActive then
         cancelCollectTokensThread()
         return
     end
     if collectTokensThread then return end
     collectTokensThread = task.spawn(function()
-        while Config.AutoCollectTokens or Config.AutoCollectDragonBalls or Config.AutoWish or Config.AutoRollPets or Config.AutoRaid or Config.AutoVoyage or Config.AutoPetQuests or Config.AutoPackOpener or Config.AutoCook or Config.AutoUpgradeRod or Config.NotifyMerchant do
+        while Config.AutoCollectTokens or Config.AutoCollectSummerTokens or Config.AutoCollectDragonBalls or Config.AutoWish or Config.AutoRollPets or Config.AutoRaid or Config.AutoVoyage or Config.AutoPetQuests or Config.AutoPackOpener or Config.AutoCook or Config.AutoUpgradeRod or Config.NotifyMerchant do
             -- Collect Map Tokens & Potions
             if Config.AutoCollectTokens then
                 local tag = player.Name .. "Token"
@@ -4217,6 +4227,21 @@ function startAutoCollectTokensLoop()
                         if item:IsA("BasePart") and item.Transparency < 1 then
                             item.Transparency = 1
                             pcall(function() ReplicatedStorage.Remotes.Potion:FireServer("Collect", item.Name) end)
+                        end
+                    end
+                end)
+            end
+
+            -- Collect Summer Event Tokens
+            if Config.AutoCollectSummerTokens then
+                pcall(function()
+                    local summerRemote = ReplicatedStorage.Remotes:FindFirstChild("Summer")
+                    if summerRemote then
+                        for _, token in ipairs(game:GetService("CollectionService"):GetTagged("SummerTokens")) do
+                            if token:GetAttribute("Collected") ~= true then
+                                token:SetAttribute("Collected", true)
+                                pcall(function() summerRemote:FireServer("Collect", token.Name) end)
+                            end
                         end
                     end
                 end)
